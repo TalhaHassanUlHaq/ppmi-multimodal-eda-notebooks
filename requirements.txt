@@ -1,0 +1,14 @@
+ipykernel
+jupyterlab
+matplotlib
+nbconvert
+nbformat
+numpy
+openpyxl
+pandas
+pillow
+pypdf
+pytest
+python-docx
+scipy
+seaborn

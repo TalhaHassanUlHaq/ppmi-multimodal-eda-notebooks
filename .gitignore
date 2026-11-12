@@ -1,0 +1,47 @@
+# Restricted and participant-level data
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.parquet
+*.feather
+*.sav
+*.dta
+*.nii
+*.nii.gz
+*.dcm
+*.dicom
+*.pdf
+*.docx
+data/
+raw/
+EDA/outputs/
+outputs/
+
+# Credentials and local configuration
+.env
+.env.*
+*.pem
+*.key
+
+# Python and Jupyter runtime artifacts
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.coverage
+htmlcov/
+
+# IDE and operating-system artifacts
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Packaging-workspace duplicates; canonical files live at root and under EDA/
+/notebooks/
+/scripts/
+/src/
+/tests/
