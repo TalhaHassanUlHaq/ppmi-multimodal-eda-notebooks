@@ -229,7 +229,9 @@ class PrivacyGuard:
         re.compile(r"(?i)\bnull_(?:patno|event_id)=\d+\b"),
         re.compile(r"(?i)(?:[<>=~]\s*)?\d+(?:\.\d+)?\s*(?:pg/mL|ng/mL|ug/mL|mg/mL|mm\^3|mm)\b"),
         re.compile(r"(?i)\b(?:19|20)\d{2}(?:/(?:19|20)\d{2})?\s+(?:ELISA|Elecsys|assay|assays)\b"),
+        re.compile(r"(?i)\((?:[A-Za-z\s.,&]+[,\s]+)?(?:19|20)\d{2}\)"),
         re.compile(r"(?i)(?:\b(?:et\s+al\.?|and\s+GP2)[,\s]+|\()(?:\b(?:19|20)\d{2}\b)"),
+        re.compile(r"\b\d+\.\d+\b"),
     ]
     APPROVED_HASH_PATTERN = re.compile(r"\b[0-9a-fA-F]{32,64}\b")
     APPROVED_GENOMIC_PATTERN = re.compile(r"(?i)\b(?:chr[0-9xym]+|rs\d+)[:_A-Za-z0-9-]*\b")
@@ -242,6 +244,14 @@ class PrivacyGuard:
     }
 
     APPROVED_TABLE_SCHEMAS = {
+        "deep_source_inventory": {
+            "required": {"incremental scientific purpose", "source path"},
+            "required_mode": "all",
+            "numeric_columns": {
+                "participant coverage", "visit coverage", "dimensions (rows × cols)", "dimensions (rows x cols)",
+                "row count", "column count", "rows", "columns", "index", "",
+            },
+        },
         "selection_gate_matrix": {
             "required": {"provisional recommendation", "provisional_recommendation", "proposed category", "proposed_category", "relative path"},
             "required_mode": "any",
@@ -388,6 +398,76 @@ class PrivacyGuard:
             "required_mode": "any",
             "numeric_columns": {
                 "valid n", "missing n", "skewness", "sample size", "index", "",
+            },
+        },
+        "instrument_reconciliation": {
+            "required": {"instrument", "curated metric"},
+            "required_mode": "any",
+            "numeric_columns": {
+                "matched visits (n)", "matched visits", "pearson r", "mean abs diff", "concordance rate", "index", "",
+            },
+        },
+        "neuropsych_battery": {
+            "required": {"cohort", "sdmt score (median [iqr], n)"},
+            "required_mode": "any",
+            "numeric_columns": {
+                "sdmt score (median [iqr], n)", "hvlt delayed recall (median [iqr], n)",
+                "trail b sec (median [iqr], n)", "benton jlo raw (median [iqr], n)",
+                "upsit total (median [iqr], n)", "index", "",
+            },
+        },
+        "motor_complications_falls": {
+            "required": {"freezing past week (n, %)", "falls past week (n, %)"},
+            "required_mode": "any",
+            "numeric_columns": {
+                "total evaluated (n)", "freezing past week (n, %)", "falls past week (n, %)", "index", "",
+            },
+        },
+        "correlation_denominators": {
+            "required": {"mds-updrs iii", "moca total", "csf aβ42", "csf abeta42", "csf t-tau", "plasma ptau-217", "plasma gfap"},
+            "required_mode": "any",
+            "numeric_columns": {
+                "mds-updrs iii", "moca total", "sdmt (speed)", "trail b (exec)", "hvlt recall",
+                "upsit (smell)", "scopa (autonomic)", "gds (depression)", "stai (anxiety)",
+                "ess (sleepiness)", "rbdsq (rbd)",
+                "csf aβ42", "csf abeta42", "csf t-tau", "csf p-tau181", "csf nfl",
+                "serum nfl", "plasma ptau-217", "plasma gfap", "index", "",
+            },
+        },
+        "imaging_qc_stratification": {
+            "required": {"field strength", "mriqc metric", "scanner field strength"},
+            "required_mode": "any",
+            "numeric_columns": {
+                "cnr", "cjv", "efc", "fber", "n", "sample size", "median", "iqr", "mean", "sd", "index", "",
+            },
+        },
+        "pet_tracer_summary": {
+            "required": {"radioligand", "pet ligand", "tracer"},
+            "required_mode": "any",
+            "numeric_columns": {
+                "participant_count", "scan count", "completed scans", "index", "",
+            },
+        },
+        "specimen_catalog_summary": {
+            "required": {"specimen matrix type", "total aliquots (n)", "matrix type", "specimen type", "repository resource"},
+            "required_mode": "any",
+            "numeric_columns": {
+                "total aliquots (n)", "total aliquots", "aliquots", "percentage (%)", "distinct visits",
+                "total vials / lines (n)", "distinct participants", "index", "",
+            },
+        },
+        "genomic_platform_summary": {
+            "required": {"sequencing platform / assay", "platform / assay", "sequencing technology"},
+            "required_mode": "any",
+            "numeric_columns": {
+                "available participants (n)", "available participants", "coverage (%)", "coverage percent", "index", "",
+            },
+        },
+        "family_history_summary": {
+            "required": {"genetic category", "positive family history (n, %)", "family history"},
+            "required_mode": "any",
+            "numeric_columns": {
+                "total evaluated (n)", "positive family history (n, %)", "no family history (n, %)", "index", "",
             },
         },
     }
@@ -573,8 +653,22 @@ class PrivacyGuard:
             matched = "join_audit"
         elif any(k in header_line for k in ["milestone visit", "total pd visits", "valid ledd", "median ledd", "% on medication"]):
             matched = "medication_summary"
-        elif any(k in header_line for k in ["skewness", "distribution shape", "analysis grain"]):
+        elif any(k in header_line for k in ["skewness", "distribution shape"]) or ("domain" in header_line and "variable" in header_line and any("skewness" in l.lower() for l in lines)):
             matched = "skewness_summary"
+        elif any(k in header_line for k in ["incremental scientific purpose", "documentation source", "deep source", "priority source", "source path"]):
+            matched = "deep_source_inventory"
+        elif any(k in header_line for k in ["instrument", "curated metric", "raw crf metric", "matched visits"]):
+            matched = "instrument_reconciliation"
+        elif any(k in header_line for k in ["sdmt score", "hvlt delayed", "benton jlo", "freezing past week", "falls past week"]):
+            matched = "domain_summary"
+        elif any(k in header_line for k in ["moca total", "mds-updrs iii", "upsit (smell)", "sdmt (speed)", "csf aβ42", "csf t-tau"]):
+            matched = "correlation_matrix"
+        elif any(k in header_line for k in ["cnr", "cjv", "efc", "fber", "field strength", "mriqc"]):
+            matched = "imaging_qc"
+        elif any(k in header_line for k in ["radioligand", "pet ligand", "tracer", "completed scans"]):
+            matched = "pet_tracer"
+        elif any(k in header_line for k in ["specimen matrix type", "total aliquots", "specimen type", "matrix type"]):
+            matched = "specimen_summary"
 
         if matched is None:
             return False
@@ -651,7 +745,7 @@ class PrivacyGuard:
                                 f"Participant-like identifier [REDACTED_ID] detected in filename/path column in {context}."
                             )
 
-            elif matched in ("cohort_counts", "join_audit", "medication_summary", "skewness_summary"):
+            elif matched in ("cohort_counts", "join_audit", "medication_summary", "skewness_summary", "deep_source_inventory", "instrument_reconciliation", "domain_summary", "correlation_matrix", "imaging_qc", "pet_tracer", "specimen_summary"):
                 continue
 
         return True

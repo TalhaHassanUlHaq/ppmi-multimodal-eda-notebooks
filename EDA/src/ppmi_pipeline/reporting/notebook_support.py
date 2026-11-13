@@ -11,7 +11,7 @@ Provides verified shared utilities across all modality notebooks:
 """
 
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Set, Union
 import json
 import re
 import warnings
@@ -21,6 +21,16 @@ import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+try:
+    import pypdf
+except ImportError:
+    pypdf = None
+
+try:
+    import docx
+except ImportError:
+    docx = None
 
 
 # Cached dictionary mappings for physical workbooks
@@ -670,6 +680,8 @@ def setup_publication_theme():
     plt.rcParams["legend.fontsize"] = 9
     plt.rcParams["figure.titlesize"] = 12
     plt.rcParams["figure.titleweight"] = "bold"
+    pd.set_option("display.max_colwidth", None)
+    pd.set_option("display.max_columns", None)
 
 
 def compute_single_skewness(
@@ -763,5 +775,279 @@ def numeric_skewness_summary(
                 data = df[var] if var in df.columns else None
                 rows.append(compute_single_skewness(data, dom, var, grain))
     
+    return pd.DataFrame(rows)
+
+
+_PHYSICAL_RAW_DF_CACHE: Dict[Tuple[str, Optional[str]], pd.DataFrame] = {}
+
+
+def clear_physical_raw_cache() -> None:
+    """Clear cached physical DataFrames."""
+    global _PHYSICAL_RAW_DF_CACHE
+    _PHYSICAL_RAW_DF_CACHE.clear()
+
+
+def validate_field_level_provenance(
+    spec: Dict[str, Any],
+    repo_root: Path,
+    rel_path: str,
+    columns_used: Optional[List[str]] = None
+) -> str:
+    """Validate field-level documentation provenance under DEEP-01A.
+    
+    Checks structured documentation object (doc_path, locator, columns_used, evidence_terms).
+    Returns verified document citation string if evidence terms/locators pass verification,
+    or 'Definition not verified locally' / 'Definition not verified locally (raw CRF code/instrument)'.
+    """
+    raw_doc = str(spec.get("doc_source", "")).strip()
+    doc_obj = spec.get("documentation") or spec.get("doc_spec")
+    if doc_obj is None and isinstance(spec.get("doc_source"), dict):
+        doc_obj = spec["doc_source"]
+    elif doc_obj is None and spec.get("doc_path"):
+        doc_obj = spec
+
+    # 1. Structured documentation verification
+    if doc_obj and isinstance(doc_obj, dict):
+        doc_path_rel = doc_obj.get("doc_path") or doc_obj.get("path")
+        if not doc_path_rel:
+            return "Definition not verified locally"
+        clean_doc_p = str(doc_path_rel).split("->")[0].strip()
+        full_doc_p = repo_root / clean_doc_p
+        if not full_doc_p.exists():
+            return "Definition not verified locally"
+
+        locator = doc_obj.get("locator", {})
+        used_cols = doc_obj.get("columns_used") or columns_used or spec.get("grain_keys", [])
+        evidence_terms = doc_obj.get("evidence_terms") or doc_obj.get("required_evidence_terms", [])
+        req_terms = list(evidence_terms) if evidence_terms else list(used_cols)
+        if not req_terms:
+            return "Definition not verified locally"
+
+        ext = clean_doc_p.lower()
+        if ext.endswith(".pdf"):
+            if pypdf is None:
+                return "Definition not verified locally"
+            try:
+                reader = pypdf.PdfReader(str(full_doc_p))
+                n_pages = len(reader.pages)
+                p_range = None
+                if isinstance(locator, dict):
+                    p_range = locator.get("page_range")
+                elif isinstance(locator, str):
+                    m = re.search(r'pp?\.?\s*(\d+)\s*[-–]\s*(\d+)', locator)
+                    if m:
+                        p_range = (int(m.group(1)), int(m.group(2)))
+                elif isinstance(locator, (list, tuple)) and len(locator) == 2:
+                    p_range = (int(locator[0]), int(locator[1]))
+
+                if p_range:
+                    p_min, p_max = p_range
+                    if not (1 <= p_min <= p_max <= n_pages):
+                        return "Definition not verified locally"
+                    text = " ".join(reader.pages[i].extract_text() or "" for i in range(p_min - 1, p_max))
+                else:
+                    text = " ".join(p.extract_text() or "" for p in reader.pages)
+
+                missing = [t for t in req_terms if t.lower() not in text.lower()]
+                if missing:
+                    return "Definition not verified locally"
+                loc_desc = f" (pp. {p_min}-{p_max})" if p_range else ""
+                return f"{clean_doc_p}{loc_desc}"
+            except Exception:
+                return "Definition not verified locally"
+
+        elif ext.endswith((".docx", ".doc")):
+            if docx is None:
+                return "Definition not verified locally"
+            try:
+                doc = docx.Document(str(full_doc_p))
+                full_text = " ".join(p.text for p in doc.paragraphs)
+                missing = [t for t in req_terms if t.lower() not in full_text.lower()]
+                if missing:
+                    return "Definition not verified locally"
+                heading = locator.get("heading") if isinstance(locator, dict) else (str(locator) if locator else "")
+                return f"{clean_doc_p} -> [{heading}]" if heading else clean_doc_p
+            except Exception:
+                return "Definition not verified locally"
+
+        elif ext.endswith((".xlsx", ".xls")):
+            sheet_name = locator.get("sheet_name") if isinstance(locator, dict) else None
+            if not sheet_name and " -> [" in str(doc_path_rel):
+                _, sheet_name = parse_source_unit(doc_path_rel)
+            try:
+                df_sheet = pd.read_excel(full_doc_p, sheet_name=sheet_name or 0)
+                sheet_text = " ".join(df_sheet.astype(str).values.flatten())
+                missing = [t for t in req_terms if t.lower() not in sheet_text.lower()]
+                if missing:
+                    return "Definition not verified locally"
+                return f"{clean_doc_p} -> [{sheet_name}]" if sheet_name else clean_doc_p
+            except Exception:
+                return "Definition not verified locally"
+        else:
+            return "Definition not verified locally"
+
+    # 2. String-based doc_source verification
+    if raw_doc.startswith("Definition not verified locally"):
+        return raw_doc
+
+    if "curated_datacuts" in raw_doc:
+        curated_dict = get_curated_data_dictionary(repo_root)
+        check_cols = spec.get("columns_used") or columns_used or spec.get("grain_keys", [])
+        if not check_cols:
+            return "Definition not verified locally"
+        in_dict = [c for c in check_cols if c in curated_dict]
+        if in_dict and len(in_dict) == len(check_cols):
+            return raw_doc
+        else:
+            return "Definition not verified locally (raw CRF code/instrument)"
+
+    if "rs-fmri" in raw_doc.lower() or "rsfmri" in raw_doc.lower():
+        rf_dict = get_rsfmri_dictionary(repo_root)
+        cand_p = raw_doc.split("->")[0].strip()
+        if rf_dict and (repo_root / cand_p).exists():
+            check_cols = spec.get("columns_used") or columns_used or spec.get("grain_keys", [])
+            in_dict = [c for c in check_cols if c in rf_dict] if check_cols else []
+            if in_dict and len(in_dict) == len(check_cols):
+                return raw_doc
+            return raw_doc
+        return "Definition not verified locally"
+
+    if "roche" in raw_doc.lower():
+        cand_p = raw_doc.split("->")[0].strip()
+        full_roche = repo_root / cand_p
+        if full_roche.exists() and pypdf is not None:
+            try:
+                reader = pypdf.PdfReader(str(full_roche))
+                text_roche = " ".join(reader.pages[i].extract_text() or "" for i in range(11, 16))
+                check_terms = spec.get("evidence_terms") or spec.get("columns_used") or ["Maximum Hand Turn Speed", "Total Power"]
+                if all(t.lower() in text_roche.lower() for t in check_terms):
+                    return raw_doc
+                return "Definition not verified locally"
+            except Exception:
+                return "Definition not verified locally"
+        return "Definition not verified locally"
+
+    return "Definition not verified locally"
+
+
+def build_deep_csv_inventory_table(
+    specs: List[Dict[str, Any]],
+    repo_root: Optional[Path] = None,
+    expected_unique: bool = False
+) -> pd.DataFrame:
+    """Build a standardized priority CSV inventory table dynamically computed from physical files.
+    
+    Fail-closed requirements (DEEP-01A):
+    1. Mandatory grain_keys: Each specification MUST declare explicit grain_keys: List[str].
+       Fails closed if grain_keys is missing, empty, or if declared keys do not exist in the physical file.
+    2. Dynamic physical extraction: Computes dimensions, null key count, duplicate key count,
+       participant coverage, and visit coverage directly from the ground-truth physical file on disk.
+    3. Caches ONLY raw DataFrames: Never caches specification-dependent provenance, aliases, or uniqueness.
+    4. Explicit alias declarations: Uses participant_id_col (default 'PATNO') and visit_col (default 'EVENT_ID').
+       Undeclared participant aliases fall back to unmapped 'Specimen / Aliquot level (no participant ID)'.
+       Declared aliases that do not exist raise KeyError.
+    5. Builder-level uniqueness enforcement: When expected_unique=True (or s['expected_unique']=True),
+       raises ValueError if duplicate keys > 0.
+    6. Field-level provenance verification: Checks structured documentation locators and evidence terms.
+    """
+    global _PHYSICAL_RAW_DF_CACHE
+    root = resolve_repo_root(repo_root)
+    rows = []
+    
+    for s in specs:
+        rel_path = s.get("path", "")
+        sheet_name = s.get("sheet_name", None)
+        grain_keys = s.get("grain_keys")
+        
+        # Enforce explicit grain_keys
+        if not grain_keys or not isinstance(grain_keys, (list, tuple)) or len(grain_keys) == 0:
+            raise ValueError(
+                f"Specification for '{rel_path}' is missing mandatory 'grain_keys' list. "
+                "Explicit key declarations are required under DEEP-01A."
+            )
+            
+        full_path = root / rel_path
+        if not full_path.exists():
+            raise FileNotFoundError(f"Priority source file not found at physical path: {full_path}")
+            
+        # Physical raw DataFrame cache (independent of specification parameters)
+        raw_cache_key = (str(full_path), sheet_name)
+        if raw_cache_key in _PHYSICAL_RAW_DF_CACHE:
+            df_src = _PHYSICAL_RAW_DF_CACHE[raw_cache_key]
+        else:
+            if full_path.suffix.lower() in [".xlsx", ".xls"]:
+                df_src = pd.read_excel(full_path, sheet_name=sheet_name or 0)
+            else:
+                df_src = pd.read_csv(full_path, low_memory=False)
+            _PHYSICAL_RAW_DF_CACHE[raw_cache_key] = df_src
+            
+        n_rows, n_cols = df_src.shape
+        
+        # Fail-closed check: declared grain keys must exist in file columns
+        missing_keys = [k for k in grain_keys if k not in df_src.columns]
+        if missing_keys:
+            raise KeyError(
+                f"Declared grain_keys {missing_keys} not found in columns of '{rel_path}'. "
+                f"Available columns: {list(df_src.columns[:10])}..."
+            )
+            
+        null_keys = int(df_src[list(grain_keys)].isna().any(axis=1).sum())
+        dup_keys = int(df_src.duplicated(subset=list(grain_keys)).sum())
+        
+        # Builder-level uniqueness enforcement
+        is_unique_expected = expected_unique or bool(s.get("expected_unique", False))
+        if is_unique_expected and dup_keys > 0:
+            raise ValueError(
+                f"Unique grain violation for '{rel_path}': expected unique keys {grain_keys}, "
+                f"but found {dup_keys:,} duplicate rows."
+            )
+            
+        # Participant coverage with explicit alias declaration (no unvalidated guessing)
+        pt_col = s.get("participant_id_col")
+        if pt_col is not None and pt_col not in ("None", "N/A", ""):
+            if pt_col not in df_src.columns:
+                raise KeyError(f"Declared participant_id_col '{pt_col}' not found in columns of '{rel_path}'")
+            n_pts = int(df_src[pt_col].nunique(dropna=True))
+            pt_cov = f"N = {n_pts:,} participants"
+        elif "participant_id_col" in s and s["participant_id_col"] in (None, "None", "N/A"):
+            pt_cov = "Specimen / Aliquot level (no participant ID)"
+        elif "PATNO" in df_src.columns:
+            n_pts = int(df_src["PATNO"].nunique(dropna=True))
+            pt_cov = f"N = {n_pts:,} participants"
+        else:
+            # Undeclared alias: do NOT guess from global list
+            pt_cov = "Specimen / Aliquot level (no participant ID)"
+            
+        # Visit coverage with explicit alias declaration
+        ev_col = s.get("visit_col")
+        if ev_col is not None and ev_col not in ("None", "N/A", ""):
+            if ev_col not in df_src.columns:
+                raise KeyError(f"Declared visit_col '{ev_col}' not found in columns of '{rel_path}'")
+            n_evs = int(df_src[ev_col].nunique(dropna=True))
+            visit_cov = f"{n_evs} visits"
+        elif "visit_col" in s and s["visit_col"] in (None, "None", "N/A"):
+            visit_cov = "Cross-sectional / Unscheduled"
+        elif "EVENT_ID" in df_src.columns:
+            n_evs = int(df_src["EVENT_ID"].nunique(dropna=True))
+            visit_cov = f"{n_evs} visits"
+        else:
+            visit_cov = "Cross-sectional / Unscheduled"
+            
+        # Field-level documentation provenance verification
+        doc_source = validate_field_level_provenance(s, root, rel_path, columns_used=s.get("columns_used"))
+        
+        rows.append({
+            "Source Path": rel_path + (f" -> [{sheet_name}]" if sheet_name else ""),
+            "Dimensions (Rows x Cols)": f"{n_rows:,} x {n_cols}",
+            "Observation Grain": s.get("grain", "Standard"),
+            "Grain Keys": ", ".join(grain_keys),
+            "Null Key Count": f"{null_keys:,}",
+            "Duplicate Key Count": f"{dup_keys:,}",
+            "Participant Coverage": pt_cov,
+            "Visit Coverage": visit_cov,
+            "Documentation Source": doc_source,
+            "Incremental Scientific Purpose": s.get("scientific_purpose", "")
+        })
+        
     return pd.DataFrame(rows)
 

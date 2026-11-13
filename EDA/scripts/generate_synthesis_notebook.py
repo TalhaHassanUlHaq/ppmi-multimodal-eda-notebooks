@@ -58,9 +58,9 @@ The overarching scientific vision of the **Parkinson's Progression Markers Initi
 1. **Cross-Modality Overlap & Availability**: Establish the exact participant-level intersection across all five core PPMI modalities: Clinical, Biospecimen, Genetics, Neuroimaging, and Digital Sensors.
 2. **Selection Bias & Cohort Representativeness**: Empirically evaluate whether participants with complete multimodal datasets systematically differ in age, sex, disease duration, or motor severity from the broader clinical cohort.
 3. **Validated Cross-Modal Linkages**: Interrogate scientifically motivated descriptive associations:
-   - Dopaminergic denervation (DaTscan striatal binding) versus motor impairment severity (MDS-UPDRS Part III).
-   - Synuclein seeding activity (CSF SAA) versus dopaminergic deficit.
-   - Amyloid/tau co-pathology (CSF Aβ42, t-tau, p-tau) versus cognitive performance (MoCA).
+   - Striatal binding (DaTscan putamen SBR) versus motor examination scores (MDS-UPDRS Part III).
+   - Alpha-synuclein qualitative assay status (CSF SAA) versus striatal binding.
+   - Amyloid/tau markers (CSF Aβ42, t-tau, p-tau) versus cognitive performance (MoCA).
 4. **Relational Join Cardinality Validation**: Strictly enforce fail-closed key validation and expected cardinality (1:1 and 1:m) for all cross-modal linkages."""
     ))
 
@@ -71,8 +71,8 @@ r"""## 2. Research Questions and Explicit Non-Causal Scope
 ### 2.1 Primary Research Questions
 1. **Cross-Modal Participant Availability**: How many PPMI participants possess concurrent data across dual, triple, quadruple, and quintuple modalities?
 2. **Multimodal Selection Bias**: Does the sub-cohort of participants with complete multimodal data exhibit survivor, compliance, or severity bias relative to the full baseline clinical cohort?
-3. **Dopaminergic Denervation vs. Motor Severity**: What is the empirical correlation between quantitative putamen DaTscan SBR and MDS-UPDRS Part III motor scores in de novo PD?
-4. **Molecular Synucleinopathy vs. Imaging Concordance**: How do CSF alpha-synuclein SAA positivity rates map to quantitative and visual DaTscan deficits?
+3. **Striatal Binding vs. Motor Examination Scores**: What is the empirical correlation between quantitative putamen DaTscan SBR and MDS-UPDRS Part III motor scores in de novo PD?
+4. **Molecular Assay Status vs. Striatal Binding**: How do CSF alpha-synuclein SAA qualitative classifications map to quantitative DaTscan striatal binding ratios?
 5. **Fluid Biomarkers vs. Cognitive Function**: Do baseline CSF Aβ42, total tau, or p-tau concentrations correlate with MoCA global cognitive performance?
 
 ### 2.2 Explicit Non-Causal Scope
@@ -112,12 +112,15 @@ from ppmi_pipeline.reporting.notebook_support import (
     validate_safe_merge,
     audit_and_merge,
     privacy_safe_binned_trend,
-    privacy_safe_aggregate_summary
+    privacy_safe_aggregate_summary,
+    build_deep_csv_inventory_table
 )
 from ppmi_pipeline.reporting.privacy import PrivacyGuard
 
 # Configure publication aesthetics
 setup_publication_theme()
+pd.set_option("display.max_colwidth", None)
+pd.set_option("display.max_columns", None)
 root_path = resolve_repo_root()
 print(f"Pipeline environment initialized. Root: {root_path}")
 print(f"Timestamp: {datetime.datetime.now(datetime.timezone.utc).isoformat()}")"""
@@ -383,10 +386,10 @@ plt.tight_layout()
 plt.show()"""
     ))
 
-    # 7.4 Cross-Modal Molecular vs Imaging Concordance
+    # 7.4 Cross-Modal Molecular vs Imaging Association
     cells.append(nbf.v4.new_markdown_cell(
-r"""#### B. Molecular Synuclein Seeding (CSF SAA) vs. DaTscan Striatal Binding Deficit
-We analyze the cross-modal concordance between molecular alpha-synuclein pathology (`CSFSAA`: positive vs negative) and quantitative dopaminergic loss (`MIA_PUTAMEN_BILAT`)."""
+r"""#### B. Molecular Assay Status (CSF SAA) vs. DaTscan Striatal Binding
+We evaluate the cross-modal distributions between CSF alpha-synuclein SAA qualitative status (`CSFSAA`: positive vs negative) and quantitative striatal binding (`MIA_PUTAMEN_BILAT`)."""
     ))
 
     cells.append(nbf.v4.new_code_cell(
@@ -423,9 +426,167 @@ plt.tight_layout()
 plt.show()"""
     ))
 
-    # 7.4 Distribution Shape and Skewness
+    # Section 8: Deep Source-File Exploratory Data Analysis (CSV Extension)
     cells.append(nbf.v4.new_markdown_cell(
-r"""### 7.4 Distribution Shape and Skewness of Analyzed Numeric Variables
+r"""## 8. Deep Source-File Exploratory Data Analysis (CSV Extension)
+
+In compliance with `docs/phase_specs/deep_csv_eda_extension.md`, this section deep-dives into the cross-modal synthesis infrastructure:
+1. **Multimodal Source Inventory**: Complete profiling of the harmonized curated cut workbook sheets and primary raw source families across all five PPMI modalities.
+2. **Pairwise Modality Concurrency Matrix**: Exhaustive pairwise overlap calculations across Clinical, Biospecimen, Imaging, Genetics, and Digital Sensor modalities at baseline.
+3. **Multimodal Triangulation**: Tabular cross-profiling combining molecular CSF SAA status (`CSFSAA`), striatal dopamine transporter binding (`MIA_PUTAMEN_BILAT`), and clinical motor examination scores (`updrs3_score`).
+4. **Relational Join Audits**: Formal join verification establishing unambiguous 1:1 participant-level linkages across multimodal sub-cohorts."""
+    ))
+
+    # 8.1 Priority Multimodal Synthesis Source Inventory
+    cells.append(nbf.v4.new_code_cell(
+r"""# Table 8.1: Priority Multimodal Synthesis Source Inventory
+deep_synth_specs = [
+    {
+        "path": "curated_datacuts/PPMI_Curated_Data_Cut_Public_20260810(1).xlsx",
+        "sheet_name": "20260810",
+        "grain": "Visit-level (PATNO, EVENT_ID)",
+        "grain_keys": ["PATNO", "EVENT_ID"],
+        "doc_source": "curated_datacuts/PPMI_Curated_Data_Cut_Public_20260810(1).xlsx -> [Data dictionary]",
+        "scientific_purpose": "Harmonized core multimodal repository integrating clinical, fluid biomarker, and imaging variables."
+    },
+    {
+        "path": "curated_datacuts/PPMI_Curated_Data_Cut_Public_20260810(1).xlsx",
+        "sheet_name": "Data dictionary",
+        "grain": "Variable-level (Variable)",
+        "grain_keys": ["Variable"],
+        "doc_source": "curated_datacuts/PPMI_Curated_Data_Cut_Public_20260810(1).xlsx -> [Data dictionary]",
+        "scientific_purpose": "Canonical data dictionary defining variable roles, types, and source instruments."
+    },
+    {
+        "path": "curated_datacuts/PPMI_Curated_Data_Cut_Public_20260810(1).xlsx",
+        "sheet_name": "Information",
+        "grain": "Log-level (Revision Notes)",
+        "grain_keys": ["Revision Notes"],
+        "doc_source": "curated_datacuts/PPMI_Curated_Data_Cut_Public_20260810(1).xlsx -> [Data dictionary]",
+        "scientific_purpose": "Curation changelog and protocol version tracking across public data releases."
+    },
+    {
+        "path": "digital_Sensor/Roche_PD_Monitoring_App_v2_data_09Nov2026.csv",
+        "grain": "Measurement-level (PATNO, QRSCATID, QRSTSTID, QRSDTM)",
+        "grain_keys": ["PATNO", "QRSCATID", "QRSTSTID", "QRSDTM"],
+        "doc_source": "digital_Sensor/PPMI_Methods_Document_Roche_v1.1.pdf",
+        "scientific_purpose": "High-frequency smartphone telemetry capturing active motor tests, tremor, voice, and daily diaries."
+    }
+]
+
+df_deep_synth = build_deep_csv_inventory_table(deep_synth_specs)
+pd.set_option("display.max_colwidth", None)
+print("Table 8.1: Priority Multimodal Synthesis Source Inventory (PPMI Public Release 09Nov2026):")
+display(df_deep_synth)"""
+    ))
+
+    # 8.2 Full Pairwise Modality Overlap Matrix
+    cells.append(nbf.v4.new_markdown_cell(
+r"""### 8.2 Full Pairwise Modality Concurrency & Overlap Matrix
+We compute exact pairwise participant concurrency across all five PPMI modalities at baseline (`EVENT_ID == 'BL'`)."""
+    ))
+
+    cells.append(nbf.v4.new_code_cell(
+r"""# Table 8.2: Pairwise Participant Overlap Across Five PPMI Modalities
+mods = ['has_clinical', 'has_biospecimen', 'has_neuroimaging', 'has_genetics', 'has_sensors']
+mod_names = ['Clinical', 'Biospecimen', 'Imaging', 'Genetics', 'Digital Sensors']
+
+overlap_records = []
+for i, (m1, n1) in enumerate(zip(mods, mod_names)):
+    for j, (m2, n2) in enumerate(zip(mods, mod_names)):
+        if i <= j:
+            both = int((df_bl[m1] & df_bl[m2]).sum())
+            pct = (both / total_bl) * 100
+            pair_label = f"{n1} + {n2}" if n1 != n2 else f"{n1} (Total Enrolled)"
+            overlap_records.append({
+                "Modality Pair": pair_label,
+                "Shared Participants (N)": f"{both:,}",
+                "Overlap (%)": f"{pct:.1f}%"
+            })
+
+df_overlap = pd.DataFrame(overlap_records)
+print("Table 8.2: Pairwise Participant Overlap Across Five PPMI Modalities (Total Baseline N=5,019):")
+display(df_overlap)
+
+# Figure 5: Pairwise Modality Overlap Heatmap
+overlap_mat = np.zeros((len(mods), len(mods)))
+for i, m1 in enumerate(mods):
+    for j, m2 in enumerate(mods):
+        overlap_mat[i, j] = int((df_bl[m1] & df_bl[m2]).sum())
+
+df_mat = pd.DataFrame(overlap_mat, index=mod_names, columns=mod_names)
+plt.figure(figsize=(7.5, 6))
+sns.heatmap(df_mat, annot=True, fmt=",.0f", cmap="Blues", cbar_kws={'label': 'Shared Participants (N)'}, linewidths=0.5)
+plt.title("Figure 5: Pairwise Participant Overlap Matrix Across All Five Modalities", fontsize=11, fontweight='bold', pad=12)
+plt.tight_layout()
+plt.show()"""
+    ))
+
+    # 8.3 Tri-Modal & Quad-Modal Sub-Cohort Demographic Comparison
+    cells.append(nbf.v4.new_markdown_cell(
+r"""### 8.3 Multimodal Completeness Strata Comparison
+We evaluate whether participants possessing complete multi-modal datasets (Tri-Modal and Quad-Modal complete) systematically differ in age, education, or disease duration from the partial cohort."""
+    ))
+
+    cells.append(nbf.v4.new_code_cell(
+r"""# Table 8.3: Demographic and Clinical Comparison Across Completeness Tiers
+bias_table = privacy_safe_aggregate_summary(
+    df=df_bl,
+    group_col="modalities_count",
+    value_cols=['age', 'EDUCYRS', 'updrs3_score', 'moca']
+)
+print("Table 8.3: Baseline Characteristics Stratified by Number of Concurrently Available Modalities (Median [IQR]):")
+display(bias_table)"""
+    ))
+
+    # 8.4 Biological Triangulation: SAA x DaTscan x UPDRS III
+    cells.append(nbf.v4.new_markdown_cell(
+r"""### 8.4 Biological Triangulation: Molecular SAA $\times$ DaTscan SBR $\times$ UPDRS III
+We triangulate fluid biomarker status (`CSFSAA`), presynaptic striatal dopamine transporter binding (`MIA_PUTAMEN_BILAT`), and motor disability (`updrs3_score`) across the entire baseline cohort."""
+    ))
+
+    cells.append(nbf.v4.new_code_cell(
+r"""# Table 8.4: Cross-Modal Triangulation: Molecular SAA x DaTscan Putamen SBR x UPDRS III
+df_triang = df_bl.dropna(subset=['CSFSAA', 'MIA_PUTAMEN_BILAT', 'updrs3_score']).copy()
+df_triang['SAA_Label'] = df_triang['CSFSAA'].map({0: "CSF SAA Negative", 1: "CSF SAA Positive"}).fillna("Other/Inconclusive")
+df_triang = df_triang[df_triang['SAA_Label'].isin(["CSF SAA Negative", "CSF SAA Positive"])]
+
+triang_summary = privacy_safe_aggregate_summary(
+    df=df_triang,
+    group_col="SAA_Label",
+    value_cols=['MIA_PUTAMEN_BILAT', 'updrs3_score', 'age']
+)
+print("Table 8.4: Cross-Modal Triangulation Across Molecular SAA Status and Striatal Binding (Median [IQR]):")
+display(triang_summary)"""
+    ))
+
+    # 8.5 Consolidated Relational Join Audits
+    cells.append(nbf.v4.new_code_cell(
+r"""# Table 8.5: Consolidated Cross-Modal Relational Join Audits
+# Audit 1: Curated baseline merged with sensor substudy
+# Audit 2: Curated baseline merged with primary DaTscan SBR table
+f_dat = root_path / "DATSCAN" / "Xing_Core_Lab_-_Quant_SBR_09Nov2026.csv"
+df_dat_raw = pd.read_csv(f_dat)
+dat_bl = df_dat_raw[df_dat_raw['EVENT_ID'] == 'BL'][['PATNO', 'PUTAMEN_REF_CWM']].dropna().drop_duplicates('PATNO')
+
+df_merged_dat, audit_dat_bl = audit_and_merge(
+    left_df=df_bl[['PATNO', 'COHORT']].copy(),
+    right_df=dat_bl,
+    on=['PATNO'],
+    expected_cardinality='1:1',
+    how='inner',
+    left_name='Baseline_Curated',
+    right_name='Raw_Quant_SBR_BL'
+)
+
+consolidated_synth_audits = pd.concat([sensor_join_audit, audit_dat_bl], ignore_index=True)
+print("Table 8.5: Consolidated Cross-Modal Relational Join Audits:")
+display(consolidated_synth_audits)"""
+    ))
+
+    # 8.6 Distribution Shape and Skewness
+    cells.append(nbf.v4.new_markdown_cell(
+r"""### 8.6 Distribution Shape and Skewness of Analyzed Synthesis Variables
 
 To evaluate the distributional symmetry of cross-modal variables and multimodal completeness indicators, Fisher–Pearson sample skewness was computed across all analyzed continuous metrics:
 $$g_1 = \frac{n}{(n-1)(n-2)} \sum_{i=1}^n \left(\frac{x_i - \bar{x}}{s}\right)^3$$
@@ -437,65 +598,70 @@ Descriptive shape classifications follow standard thresholds:
     ))
 
     cells.append(nbf.v4.new_code_cell(
-"""# Table: Distribution Shape and Skewness of Analyzed Synthesis Variables
+r"""# Table 8.6: Distribution Shape and Skewness of Analyzed Synthesis Variables
 from ppmi_pipeline.reporting.notebook_support import numeric_skewness_summary
 
+n_bl = len(df_bl)
+n_pd = len(df_pd_bl)
+n_cross = len(df_pd_valid)
+n_saa_img = len(df_saa_img)
+
 skew_specs = [
-    {"domain": "Synthesis", "variable": "modalities_count", "grain": "Baseline Enrolled Participants (0-5 tiers)", "series": df_bl["modalities_count"]},
-    {"domain": "Synthesis", "variable": "MIA_PUTAMEN_BILAT", "grain": "Baseline PD Cross-Modal Subset (SBR)", "series": df_pd_valid["MIA_PUTAMEN_BILAT"]},
-    {"domain": "Synthesis", "variable": "updrs3_score", "grain": "Baseline PD Cross-Modal Subset (Score)", "series": df_pd_valid["updrs3_score"]},
-    {"domain": "Synthesis", "variable": "age", "grain": "Baseline PD Cohort (years)", "series": df_pd_bl["age"]},
-    {"domain": "Synthesis", "variable": "EDUCYRS", "grain": "Baseline PD Cohort (years)", "series": df_pd_bl["EDUCYRS"]},
-    {"domain": "Synthesis", "variable": "moca", "grain": "Baseline PD Cohort (Score)", "series": df_pd_bl["moca"]},
-    {"domain": "Synthesis", "variable": "SAA_MIA_PUTAMEN_BILAT", "grain": "SAA & DaTscan Valid Sub-cohort (SBR)", "series": df_saa_img["MIA_PUTAMEN_BILAT"]}
+    {"domain": "Synthesis", "variable": "modalities_count", "grain": f"Baseline Enrolled Participants (N={n_bl:,})", "series": df_bl["modalities_count"], "total_n": n_bl},
+    {"domain": "Synthesis", "variable": "MIA_PUTAMEN_BILAT", "grain": f"Baseline PD Cross-Modal Subset (N={n_cross:,})", "series": df_pd_valid["MIA_PUTAMEN_BILAT"], "total_n": n_cross},
+    {"domain": "Synthesis", "variable": "updrs3_score", "grain": f"Baseline PD Cross-Modal Subset (N={n_cross:,})", "series": df_pd_valid["updrs3_score"], "total_n": n_cross},
+    {"domain": "Synthesis", "variable": "age", "grain": f"Baseline PD Cohort (N={n_pd:,})", "series": df_pd_bl["age"], "total_n": n_pd},
+    {"domain": "Synthesis", "variable": "EDUCYRS", "grain": f"Baseline PD Cohort (N={n_pd:,})", "series": df_pd_bl["EDUCYRS"], "total_n": n_pd},
+    {"domain": "Synthesis", "variable": "moca", "grain": f"Baseline PD Cohort (N={n_pd:,})", "series": df_pd_bl["moca"], "total_n": n_pd},
+    {"domain": "Synthesis", "variable": "SAA_MIA_PUTAMEN_BILAT", "grain": f"CSF SAA & DaTscan Valid Sub-cohort (N={n_saa_img:,})", "series": df_saa_img["MIA_PUTAMEN_BILAT"], "total_n": n_saa_img}
 ]
 
 skewness_df = numeric_skewness_summary(skew_specs)
-print("Table: Distribution Shape and Skewness of Analyzed Synthesis Variables:")
+print("Table 8.6: Distribution Shape and Skewness of Analyzed Synthesis Variables:")
 display(skewness_df)"""
     ))
 
-    # Section 8: Results-Driven Interpretation
+    # Section 9: Results-Driven Interpretation
     cells.append(nbf.v4.new_markdown_cell(
-r"""## 8. Results-Driven Interpretation Generated from Computed Aggregates
+r"""## 9. Results-Driven Interpretation Generated from Computed Aggregates
 
 Based on the empirical cross-modal synthesis results:
 
 1. **Multimodal Availability Infrastructure**:
-   - Of the $5,019$ baseline PPMI participants, over $95\%$ possess complete clinical evaluations, $96\%$ have DaTscan SPECT imaging, and $90\%$ have core CSF biospecimen assays.
-   - The Tri-Modal sub-cohort (concurrent Clinical + Biospecimen + Neuroimaging) comprises $4,256$ participants ($84.8\%$), and the Quad-Modal sub-cohort (+ Genetics) comprises $3,072$ participants ($61.2\%$).
+   - As quantified in Table 8.2 and Figure 5, baseline participant overlap demonstrates substantial concurrency across clinical, neuroimaging, and biospecimen modalities.
+   - The Tri-Modal and Quad-Modal complete sub-cohorts encompass a substantial proportion of baseline participants, supporting integrated multi-domain modeling.
 2. **Multimodal Completeness Comparison**:
-   - Descriptive comparison of the Partial/Other, Tri-Modal complete, and Quad-Modal complete sub-cohorts shows similar medians across measured baseline covariates: age ($\approx 61–62$ years), education ($\approx 16$ years), disease duration ($\approx 0.5$ years), and motor severity (UPDRS III median $\approx 20–21$).
+   - Descriptive comparison of the Partial/Other, Tri-Modal complete, and Quad-Modal complete sub-cohorts (Table 8.3) shows broadly comparable distributions across measured baseline demographic and clinical covariates.
    - While measured covariates are aligned across strata, unmeasured selection factors (e.g., procedure contraindications or travel burden) cannot be ruled out.
-3. **Dopaminergic Denervation vs. Motor Severity**:
-   - An inverse monotonic association is observed between DaTscan bilateral putamen SBR and MDS-UPDRS Part III motor examination score in de novo PD ($\rho = -0.197$, $p = 1.71 \times 10^{-14}$, $N=1,490$). Lower dopamine transporter availability is associated with higher motor severity.
-   - Binned decile analysis shows progressive median UPDRS III score increases across descending SBR deciles. The modest magnitude ($\rho \approx -0.2$) indicates that SPECT imaging provides non-redundant biological information complementing clinical motor scores.
-4. **Molecular vs. Neuroimaging Concordance**:
-   - Participants with positive CSF SAA display markedly reduced putamen SBR (median $\approx 0.84$), whereas CSF SAA negative individuals display preserved striatal binding (median $\approx 1.92$)."""
+3. **Striatal Binding vs. Motor Examination Scores**:
+   - An inverse monotonic association is observed between DaTscan bilateral putamen SBR and MDS-UPDRS Part III motor examination score in de novo PD. Lower dopamine transporter availability is associated with higher motor examination scores.
+   - Binned decile analysis shows progressive median UPDRS III score increases across descending SBR deciles, reflecting that striatal dopamine transporter binding and clinician-rated motor exam scores capture distinct clinical and imaging axes with substantial unexplained variance.
+4. **Molecular Assay Status vs. Striatal Binding**:
+   - As displayed in Table 8.4, participants stratified by CSF SAA qualitative status exhibit differences in striatal putamen SBR distributions in the analyzed cohort."""
     ))
 
-    # Section 9: Limitations, Missingness, and Integration Boundaries
+    # Section 10: Limitations, Missingness, and Integration Boundaries
     cells.append(nbf.v4.new_markdown_cell(
-r"""## 9. Limitations and Integration Boundaries
+r"""## 10. Limitations and Integration Boundaries
 
 1. **Digital Sensor Substudy Scoping**: Digital mobile telemetry data are currently available for a focused pilot subset ($N=32$). Quintuple-modality integration is restricted to this pilot group and cannot be extrapolated fleet-wide.
 2. **Temporal Alignment**: While baseline clinical, biospecimen, and imaging milestones occur within standard protocol windows (typically $\pm 45$ days), exact same-day acquisition is not always feasible for complex multi-procedure visits (lumbar puncture vs SPECT vs MRI).
 3. **Observational Scope**: Cross-modal associations are non-interventional; correlations do not demonstrate causal pathology propagation or drug responsiveness without prospective trial verification."""
     ))
 
-    # Section 10: Conclusions Grounded in Displayed Results
+    # Section 11: Conclusions Grounded in Displayed Results
     cells.append(nbf.v4.new_markdown_cell(
-r"""## 10. Conclusions Grounded in Displayed Results
+r"""## 11. Conclusions Grounded in Displayed Results
 
-1. **High Multimodal Completeness**: PPMI achieves $>80\%$ concurrency across clinical, biospecimen, and neuroimaging modalities at baseline.
-2. **Concordant Baseline Measurements**: Complete multimodal subsets show comparable distributions across measured baseline clinical and demographic variables.
-3. **Cross-Modal Biological Complementarity**: Fluid seeding assays and dopamine transporter SPECT imaging align closely in identifying synucleinopathy, while SPECT and motor examination scores capture complementary, non-redundant aspects of disease severity.
-4. **Analytical Readiness**: The multimodal dataset pipeline is structurally verified, fail-closed privacy-certified, and ready for longitudinal modeling."""
+1. **Multimodal Availability**: PPMI achieves broad participant overlap across clinical, biospecimen, and neuroimaging modalities at baseline, enabling cross-domain analytical profiling.
+2. **Baseline Covariate Comparisons**: Complete multimodal subsets exhibit broadly comparable distributions across measured baseline clinical and demographic variables.
+3. **Cross-Domain Measurements**: Fluid qualitative assays, dopamine transporter SPECT imaging, and clinician-rated motor examination scores capture distinct measurements across participant groups.
+4. **Data Infrastructure Status**: The multimodal dataset pipeline is structurally verified, fail-closed privacy-certified, and archived."""
     ))
 
-    # Section 11: Reproducibility and Privacy Validation Summary
+    # Section 12: Reproducibility and Privacy Validation Summary
     cells.append(nbf.v4.new_markdown_cell(
-r"""## 11. Reproducibility and Privacy Validation Summary
+r"""## 12. Reproducibility and Privacy Validation Summary
 
 - **Participant Privacy**: All displayed tables represent cohort aggregates ($N$, medians, IQRs, percentages). Zero participant identifiers (`PATNO`), scan IDs, or individual records are displayed.
 - **Reproducibility**: The code cell below programmatically certifies privacy compliance via `PrivacyGuard`."""
@@ -507,6 +673,8 @@ guard = PrivacyGuard()
 
 # Validate that multimodal aggregate table contains zero participant records
 guard.assert_no_participant_records(bias_summary.to_dict(orient="records"))
+guard.assert_no_participant_records(bias_table.to_dict(orient="records"))
+guard.assert_no_participant_records(triang_summary.to_dict(orient="records"))
 print("PrivacyGuard verification: PASSED (zero participant records or identifiers detected in aggregates).")
 print("All multimodal synthesis outputs certified privacy-compliant. Execution complete.")"""
     ))

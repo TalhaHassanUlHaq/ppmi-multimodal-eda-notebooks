@@ -52,7 +52,7 @@ r"""# PPMI Exploratory Data Analysis: Multimodal Neuroimaging
 ---
 
 ## 1. Scientific Scope & Introduction
-Neuroimaging provides the definitive in vivo structural, functional, and molecular windows into Parkinson's disease pathophysiology. The **Parkinson's Progression Markers Initiative (PPMI)** neuroimaging battery encompasses five distinct modalities analyzed across standardized core laboratories:
+Neuroimaging provides in vivo structural, functional, and molecular windows into Parkinson's disease pathophysiology. The **Parkinson's Progression Markers Initiative (PPMI)** neuroimaging battery encompasses five distinct modalities analyzed across standardized core laboratories:
 1. **Dopamine Transporter (DaTscan) SPECT**: Quantitative striatal binding ratios (SBR; caudate and putamen relative to reference occipital or cerebellar white matter) and central visual read interpretations (Xing Core Lab).
 2. **Structural Magnetic Resonance Imaging (MRI)**: FreeSurfer (v7.2) automated cortical reconstruction and subcortical volumetrics (ASEG subcortical segmentation, APARC cortical thickness, and surface area).
 3. **Diffusion Tensor Imaging (DTI)**: Region-of-interest (ROI) microstructural integrity metrics (Fractional Anisotropy [FA] and Mean Diffusivity [MD]). Analyses strictly preserve manual ROI provenance without unverified tractography claims.
@@ -66,7 +66,7 @@ r"""## 2. Research Questions and Explicit Non-Causal Scope
 
 ### 2.1 Primary Research Questions
 1. **DaTscan Striatal Binding Degradation**: What are the quantitative SBR distributions in the caudate and putamen across PD, HC, SWEDD, and Prodromal cohorts, and what is the degree of striatal asymmetry?
-2. **Visual vs. Quantitative SBR Concordance**: How accurately do binary central visual reads (positive vs. negative) align with quantitative putamen SBR thresholds?
+2. **Visual vs. Quantitative SBR Alignment**: How do binary central visual reads (positive vs. negative) compare with quantitative putamen SBR thresholds?
 3. **Structural MRI Subcortical & Cortical Volumetrics**: How do subcortical structures (hippocampus, caudate, putamen, lateral ventricles) and mean cortical thickness compare across diagnostic categories?
 4. **Microstructural DTI ROI Integrity**: What are the distributions of manual ROI Fractional Anisotropy (FA) in substantia nigra and white matter reference tracts?
 5. **Functional rs-fMRI Motion & Acquisition Quality**: What are the head motion distributions (Mean FD) during resting BOLD scans, and what proportion of sessions satisfy strict motion QC criteria?
@@ -114,6 +114,8 @@ from ppmi_pipeline.reporting.privacy import PrivacyGuard
 
 # Configure publication aesthetics
 setup_publication_theme()
+pd.set_option("display.max_colwidth", None)
+pd.set_option("display.max_columns", None)
 root_path = resolve_repo_root()
 print(f"Pipeline environment initialized. Root: {root_path}")
 print(f"Timestamp: {datetime.datetime.now(datetime.timezone.utc).isoformat()}")"""
@@ -274,10 +276,10 @@ plt.tight_layout()
 plt.show()"""
     ))
 
-    # 7.2 Visual Interpretation vs. Quantitative SBR Concordance
+    # 7.2 Visual Interpretation vs. Quantitative SBR Alignment
     cells.append(nbf.v4.new_markdown_cell(
-r"""### 7.2 DaTscan Visual Interpretation vs. Quantitative Putamen SBR Concordance
-We examine the biological concordance between binary qualitative visual reads (`DATSCAN_VISINTRP`: positive vs. negative) and objective quantitative putamen SBR."""
+r"""### 7.2 DaTscan Visual Interpretation vs. Quantitative Putamen SBR Alignment
+We examine the descriptive correspondence between binary qualitative visual reads (`DATSCAN_VISINTRP`: positive vs. negative) and objective quantitative putamen SBR."""
     ))
 
     cells.append(nbf.v4.new_code_cell(
@@ -468,11 +470,332 @@ if len(df_av133) > 0 and 'PET_RPUTANT_S' in df_av133.columns and 'PET_RCAUD_S' i
     plt.show()"""
     ))
 
-    # 7.6 Distribution Shape and Skewness
+    # Section 8: Deep Source-File Exploratory Data Analysis (CSV Extension)
     cells.append(nbf.v4.new_markdown_cell(
-r"""### 7.6 Distribution Shape and Skewness of Analyzed Numeric Variables
+r"""## 8. Deep Source-File Exploratory Data Analysis (CSV Extension)
 
-To assess distributional normality, structural volumetric spread, and binding ratio symmetry across imaging modalities, Fisher–Pearson sample skewness was computed across all analyzed continuous neuroimaging metrics:
+In compliance with `docs/phase_specs/deep_csv_eda_extension.md`, this section extends multimodal neuroimaging analysis into native acquisition CSV datasets:
+1. **Instrument Reconciliation**: Descriptive alignment between central qualitative visual reads and quantitative striatal binding ratios across SPECT scans.
+2. **DaTscan Technical Metadata**: Injected dose and acquisition protocol parameters from core lab acquisition logs.
+3. **Predeclared Cortical Morphology**: FreeSurfer v7.2 cortical thickness profiling in predeclared regions: left entorhinal cortex (medial temporal memory hub) and left precentral gyrus (primary motor cortex).
+4. **Automated Quality Control**: Structural MRIQC quantitative image metrics (`cnr`, `cjv`, `efc`, `fber`) and technical sequence acquisition rates.
+5. **Resting-State fMRI Motion QC**: Quantitative framewise displacement head-motion metrics (`MeanFD`, `MaxFD`) and scan duration from core lab rs-fMRI reports.
+6. **Targeted Molecular PET Imaging**: Profiling synaptic vesicle density (18F-SynVesT-1 / SV2A) and tau neurofibrillary tangles (18F-PI-2620 / Tau PET) in exploratory substudy cohorts.
+7. **Fail-Closed Relational Auditing**: Explicit join audits verifying $1:1$ cardinality for every cross-table merge."""
+    ))
+
+    # 8.1 Priority Neuroimaging Source CSV Inventory
+    cells.append(nbf.v4.new_code_cell(
+r"""# Table 8.1: Priority Neuroimaging Source CSV Inventory
+from ppmi_pipeline.reporting.notebook_support import build_deep_csv_inventory_table
+
+deep_imaging_specs = [
+    {
+        "path": "DATSCAN/Xing_Core_Lab_-_Quant_SBR_09Nov2026.csv",
+        "grain": "Scan-level (PATNO, DATSCAN_DATE)",
+        "grain_keys": ["PATNO", "DATSCAN_DATE"],
+        "doc_source": "Definition not verified locally (raw CRF code/instrument)",
+        "scientific_purpose": "Quantitative striatal binding ratios across striatal subregions."
+    },
+    {
+        "path": "DATSCAN/Xing_Core_Lab_-_Visual_Read_09Nov2026.csv",
+        "grain": "Scan-level (PATNO, DATSCAN_DATE)",
+        "grain_keys": ["PATNO", "DATSCAN_DATE"],
+        "doc_source": "Definition not verified locally (raw CRF code/instrument)",
+        "scientific_purpose": "Central visual interpretation (positive vs. negative) evaluating striatal uptake."
+    },
+    {
+        "path": "DATSCAN/Xing_Core_Lab_-_DATSCAN_acquisition_metadata_09Nov2026.csv",
+        "grain": "Scan-level (PATNO, DATSCAN_DATE)",
+        "grain_keys": ["PATNO", "DATSCAN_DATE"],
+        "doc_source": "Definition not verified locally (raw CRF code/instrument)",
+        "scientific_purpose": "SPECT camera parameters, injected ligand dose, and technical acquisition flags."
+    },
+    {
+        "path": "MR Analysis Results/FS7_ASEG_VOL_09Nov2026.csv",
+        "grain": "Scan-level (PATNO, EVENT_ID)",
+        "grain_keys": ["PATNO", "EVENT_ID"],
+        "doc_source": "Definition not verified locally (raw CRF code/instrument)",
+        "scientific_purpose": "Automated subcortical segmentation volumetrics (hippocampus, caudate, putamen, ventricles)."
+    },
+    {
+        "path": "MR Analysis Results/FS7_APARC_CTH_09Nov2026.csv",
+        "grain": "Scan-level (PATNO, EVENT_ID)",
+        "grain_keys": ["PATNO", "EVENT_ID"],
+        "doc_source": "Definition not verified locally (raw CRF code/instrument)",
+        "scientific_purpose": "Regional cortical thickness across 68 parcellated gyral regions."
+    },
+    {
+        "path": "MR Analysis Results/MRIQC_09Nov2026.csv",
+        "grain": "Scan-level (PATNO, EVENT_ID)",
+        "grain_keys": ["PATNO", "EVENT_ID"],
+        "doc_source": "Definition not verified locally (raw CRF code/instrument)",
+        "scientific_purpose": "Quantitative spatial noise, contrast-to-noise ratio (CNR), and artifact metrics."
+    },
+    {
+        "path": "MRI Acquisition/Xing_Core_Lab_-_MRI_acquisition_metadata_09Nov2026.csv",
+        "grain": "Scan-level (PATNO, EVENT_ID)",
+        "grain_keys": ["PATNO", "EVENT_ID"],
+        "doc_source": "Definition not verified locally (raw CRF code/instrument)",
+        "scientific_purpose": "Technical MRI sequence acquisition tracking (DTI, rs-fMRI, 3D T1/T2) and core-lab acceptability."
+    },
+    {
+        "path": "MR Analysis Results/PPMI_rs-fMRI_Data-and-Methods/PPMI_fs-fMRI_dataReport_spreadsheet_FINAL_20191121.xlsx",
+        "sheet_name": "PPMI_rsfMRI_09052019",
+        "grain": "Scan-level (ImageID)",
+        "grain_keys": ["ImageID"],
+        "doc_source": "MR Analysis Results/PPMI_rs-fMRI_Data-and-Methods/PPMI_fs-fMRI_dataReport_spreadsheet_FINAL_20191121.xlsx -> [Dictionary]",
+        "scientific_purpose": "Resting-state fMRI head-motion framewise displacement metrics (MeanFD, MaxFD) and scan length."
+    },
+    {
+        "path": "dti/DTI_Regions_of_Interest_09Nov2026.csv",
+        "grain": "ROI-level (PATNO, PAG_NAME, INFODT, Measure, Tissue)",
+        "grain_keys": ["PATNO", "PAG_NAME", "INFODT", "Measure", "Tissue"],
+        "doc_source": "Definition not verified locally (raw CRF code/instrument)",
+        "scientific_purpose": "Manual planar ROI fractional anisotropy (FA) and mean diffusivity (MD) in substantia nigra."
+    },
+    {
+        "path": "PET/SV2A_PET_SUVR_Analysis_09Nov2026.csv",
+        "grain": "Region-level (PATNO, EVENT_ID, SV2A_REGION)",
+        "grain_keys": ["PATNO", "EVENT_ID", "SV2A_REGION"],
+        "doc_source": "Definition not verified locally (raw CRF code/instrument)",
+        "scientific_purpose": "Synaptic vesicle glycoprotein 2A (SV2A) standardized uptake value ratios."
+    },
+    {
+        "path": "PET/TAU_PET_Analysis_09Nov2026.csv",
+        "grain": "Region-level (PATNO, EVENT_ID, TAU_REGION)",
+        "grain_keys": ["PATNO", "EVENT_ID", "TAU_REGION"],
+        "doc_source": "Definition not verified locally (raw CRF code/instrument)",
+        "scientific_purpose": "Tau neurofibrillary tangle deposition SUVR across Braak staging volumes."
+    }
+]
+
+df_deep_inv = build_deep_csv_inventory_table(deep_imaging_specs, repo_root=repo_root)
+pd.set_option("display.max_colwidth", None)
+print("Table 8.1: Deep Source-File Neuroimaging Physical Source Inventory:")
+display(df_deep_inv)"""
+    ))
+
+    # 8.2 Visual Read vs Quantitative SBR Cross-Classification and DaTscan Acquisition
+    cells.append(nbf.v4.new_code_cell(
+r"""# Section 8.2: Visual Read vs. Quantitative Striatal Binding Alignment and Acquisition Metadata
+df_sbr_raw = pd.read_csv(repo_root / "DATSCAN" / "Xing_Core_Lab_-_Quant_SBR_09Nov2026.csv", low_memory=False).drop_duplicates(subset=["PATNO", "DATSCAN_DATE"])
+df_vis_raw = pd.read_csv(repo_root / "DATSCAN" / "Xing_Core_Lab_-_Visual_Read_09Nov2026.csv", low_memory=False).drop_duplicates(subset=["PATNO", "DATSCAN_DATE"])
+
+merged_dat, audit_dat = audit_and_merge(
+    df_sbr_raw[["PATNO", "DATSCAN_DATE", "PUTAMEN_REF_CWM", "CAUDATE_REF_CWM"]],
+    df_vis_raw[["PATNO", "DATSCAN_DATE", "DATSCAN_VISINTRP"]],
+    on=["PATNO", "DATSCAN_DATE"],
+    expected_cardinality="1:1",
+    left_name="Quant_SBR",
+    right_name="Visual_Read"
+)
+
+vis_summary = privacy_safe_aggregate_summary(
+    df=merged_dat,
+    group_col="DATSCAN_VISINTRP",
+    value_cols=["PUTAMEN_REF_CWM", "CAUDATE_REF_CWM"]
+)
+print("Table 8.2A: Quantitative SBR Across Central Visual Read Classifications (Median [IQR]):")
+display(vis_summary)
+
+# DaTscan Acquisition Metadata Dose Summary
+df_dat_acq = pd.read_csv(repo_root / "DATSCAN" / "Xing_Core_Lab_-_DATSCAN_acquisition_metadata_09Nov2026.csv", low_memory=False)
+dat_dose = pd.to_numeric(df_dat_acq["DATSCAN_TOTAL_DOSE_CALC"], errors="coerce").dropna()
+
+dat_acq_summary = pd.DataFrame([{
+    "Parameter": "Total Injected Dose (MBq / mCi equiv)",
+    "Total Evaluated Records": f"{len(df_dat_acq):,}",
+    "Valid Dose Records": f"{len(dat_dose):,}",
+    "Median [IQR]": f"{dat_dose.median():.2f} [{dat_dose.quantile(0.25):.2f}, {dat_dose.quantile(0.75):.2f}]",
+    "Mean (Std)": f"{dat_dose.mean():.2f} ({dat_dose.std():.2f})"
+}])
+print("\nTable 8.2B: DaTscan SPECT Acquisition Injected Dose Summary:")
+display(dat_acq_summary)
+
+# Figure 6: Visual Read vs Quantitative Putamen SBR Distribution
+plt.figure(figsize=(8, 4.5))
+vis_groups = [merged_dat[merged_dat["DATSCAN_VISINTRP"] == g]["PUTAMEN_REF_CWM"].dropna().values for g in ["positive", "negative"]]
+plt.boxplot(vis_groups, tick_labels=[f"Visual Positive\n(N={len(vis_groups[0]):,})", f"Visual Negative\n(N={len(vis_groups[1]):,})"], patch_artist=True)
+plt.title("Figure 6: Putamen SBR Distribution by Central Visual Interpretation", fontsize=11, fontweight="bold", pad=12)
+plt.ylabel("Putamen SBR (Reference: Occipital/CWM)", fontsize=10, fontweight="bold")
+plt.grid(True, linestyle="--", alpha=0.5, axis="y")
+plt.tight_layout()
+plt.show()"""
+    ))
+
+    # 8.3 Predeclared FreeSurfer Cortical Thickness
+    cells.append(nbf.v4.new_code_cell(
+r"""# Section 8.3: Predeclared FreeSurfer v7 Cortical Thickness (Entorhinal & Precentral Cortex)
+df_cth_raw = pd.read_csv(repo_root / "MR Analysis Results" / "FS7_APARC_CTH_09Nov2026.csv", low_memory=False)
+cth_bl = df_cth_raw[df_cth_raw["EVENT_ID"] == "BL"][["PATNO", "lh_entorhinal", "lh_precentral"]].dropna().drop_duplicates("PATNO")
+
+merged_cth, audit_cth = audit_and_merge(
+    df_bl[["PATNO", "COHORT_LABEL"]],
+    cth_bl,
+    on=["PATNO"],
+    expected_cardinality="1:1",
+    left_name="Baseline_Curated",
+    right_name="FS7_CTH"
+)
+
+cth_summary = privacy_safe_aggregate_summary(
+    df=merged_cth,
+    group_col="COHORT_LABEL",
+    value_cols=["lh_entorhinal", "lh_precentral"]
+)
+print("Table 8.3: Baseline Predeclared FreeSurfer Cortical Thickness Across Cohorts (Median [IQR], mm):")
+display(cth_summary)
+
+# Figure 7: Predeclared Cortical Thickness Boxplots
+fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+ent_data = [merged_cth[merged_cth["COHORT_LABEL"] == c]["lh_entorhinal"].dropna().values for c in cohort_order]
+axes[0].boxplot(ent_data, tick_labels=[f"{c.split()[0]}\n(N={len(d):,})" for c, d in zip(cohort_order, ent_data)], patch_artist=True)
+axes[0].set_title("Panel A: Left Entorhinal Cortex Thickness", fontsize=10, fontweight="bold")
+axes[0].set_ylabel("Cortical Thickness (mm)", fontsize=9, fontweight="bold")
+axes[0].grid(True, linestyle="--", alpha=0.5, axis="y")
+
+prec_data = [merged_cth[merged_cth["COHORT_LABEL"] == c]["lh_precentral"].dropna().values for c in cohort_order]
+axes[1].boxplot(prec_data, tick_labels=[f"{c.split()[0]}\n(N={len(d):,})" for c, d in zip(cohort_order, prec_data)], patch_artist=True)
+axes[1].set_title("Panel B: Left Precentral Gyrus Thickness", fontsize=10, fontweight="bold")
+axes[1].set_ylabel("Cortical Thickness (mm)", fontsize=9, fontweight="bold")
+axes[1].grid(True, linestyle="--", alpha=0.5, axis="y")
+
+plt.suptitle("Figure 7: Predeclared FreeSurfer v7 Cortical Thickness Profiles Across Diagnostic Cohorts", fontsize=11, fontweight="bold", y=1.02)
+plt.tight_layout()
+plt.show()"""
+    ))
+
+    # 8.4 Structural MRI Quality Control (MRIQC) & Sequence Acquisition Tracking
+    cells.append(nbf.v4.new_code_cell(
+r"""# Section 8.4: Automated Structural MRI Quality Control (MRIQC) & Technical Acquisition Metrics
+df_mriqc_raw = pd.read_csv(repo_root / "MR Analysis Results" / "MRIQC_09Nov2026.csv", low_memory=False)
+mriqc_bl = df_mriqc_raw[df_mriqc_raw["EVENT_ID"] == "BL"][["PATNO", "cnr", "cjv", "efc", "fber"]].dropna().drop_duplicates("PATNO")
+
+merged_mriqc, audit_mriqc = audit_and_merge(
+    df_bl[["PATNO", "COHORT_LABEL"]],
+    mriqc_bl,
+    on=["PATNO"],
+    expected_cardinality="1:1",
+    left_name="Baseline_Curated",
+    right_name="MRIQC"
+)
+
+mriqc_summary = privacy_safe_aggregate_summary(
+    df=merged_mriqc,
+    group_col="COHORT_LABEL",
+    value_cols=["cnr", "cjv", "efc", "fber"]
+)
+print("Table 8.4A: Baseline Structural MRIQC Automated Quality Metrics Across Cohorts (Median [IQR]):")
+display(mriqc_summary)
+
+# MRI Technical Sequence Acquisition Tracking
+df_mri_acq = pd.read_csv(repo_root / "MRI Acquisition" / "Xing_Core_Lab_-_MRI_acquisition_metadata_09Nov2026.csv", low_memory=False)
+df_mri_bl = df_mri_acq[df_mri_acq["EVENT_ID"] == "BL"]
+
+def get_acq_row(df_sub, pop_name, element_name, col_name):
+    tot = len(df_sub)
+    valid_n = int(df_sub[col_name].notna().sum())
+    missing_n = int(df_sub[col_name].isna().sum())
+    yes_n = int((df_sub[col_name].astype(str).str.upper() == "YES").sum())
+    no_n = int((df_sub[col_name].astype(str).str.upper() == "NO").sum())
+    yes_pct = (yes_n / valid_n * 100.0) if valid_n > 0 else 0.0
+    no_pct = (no_n / valid_n * 100.0) if valid_n > 0 else 0.0
+    return {
+        "Protocol Element": element_name,
+        "Target Population": pop_name,
+        "Total Records (N)": f"{tot:,}",
+        "Valid N": f"{valid_n:,}",
+        "Missing N": f"{missing_n:,}",
+        "Yes N (%)": f"{yes_n:,} ({yes_pct:.1f}%)",
+        "No N (%)": f"{no_n:,} ({no_pct:.1f}%)"
+    }
+
+mri_acq_rows = [
+    # Full Cohort Records
+    get_acq_row(df_mri_acq, f"All Acquisition Records (N={len(df_mri_acq):,})", "DTI Sequence Acquired (MRI_SEQ_DTI)", "MRI_SEQ_DTI"),
+    get_acq_row(df_mri_acq, f"All Acquisition Records (N={len(df_mri_acq):,})", "Resting-State fMRI Acquired (MRI_SEQ_RS)", "MRI_SEQ_RS"),
+    get_acq_row(df_mri_acq, f"All Acquisition Records (N={len(df_mri_acq):,})", "Core-Lab Image Acceptability (MRI_IMAGE_ACCEPTABLE)", "MRI_IMAGE_ACCEPTABLE"),
+    # Baseline Sessions
+    get_acq_row(df_mri_bl, f"Baseline Sessions (N={len(df_mri_bl):,})", "DTI Sequence Acquired (MRI_SEQ_DTI)", "MRI_SEQ_DTI"),
+    get_acq_row(df_mri_bl, f"Baseline Sessions (N={len(df_mri_bl):,})", "Resting-State fMRI Acquired (MRI_SEQ_RS)", "MRI_SEQ_RS"),
+    get_acq_row(df_mri_bl, f"Baseline Sessions (N={len(df_mri_bl):,})", "Core-Lab Image Acceptability (MRI_IMAGE_ACCEPTABLE)", "MRI_IMAGE_ACCEPTABLE"),
+]
+mri_acq_tbl = pd.DataFrame(mri_acq_rows)
+print("\nTable 8.4B: MRI Technical Sequence Acquisition Adherence & Core-Lab Quality Acceptance (All Records vs. Baseline):")
+display(mri_acq_tbl)
+print("\nMRIQC Descriptive Summary: Contrast-to-noise ratio (CNR) and Coefficient of Joint Variation (CJV) distributions reflect automated tissue boundary metrics across multi-site scanner acquisitions.")"""
+    ))
+
+    # 8.5 Resting-State fMRI Motion QC & Targeted Molecular PET Imaging
+    cells.append(nbf.v4.new_code_cell(
+r"""# Section 8.5: Resting-State fMRI Motion QC & Molecular PET Imaging (SV2A & 18F-Tau)
+rs_path = repo_root / "MR Analysis Results" / "PPMI_rs-fMRI_Data-and-Methods" / "PPMI_fs-fMRI_dataReport_spreadsheet_FINAL_20191121.xlsx"
+df_rsfmri = pd.read_excel(rs_path, sheet_name="PPMI_rsfMRI_09052019")
+
+rs_summary = pd.DataFrame([{
+    "Metric / Parameter": "rs-fMRI Mean Framewise Displacement (MeanFD, mm)",
+    "Total Scans (N)": f"{len(df_rsfmri):,}",
+    "Unique Participants": f"{df_rsfmri['PATNO'].nunique():,}",
+    "Median [IQR]": f"{df_rsfmri['MeanFD'].median():.3f} [{df_rsfmri['MeanFD'].quantile(0.25):.3f}, {df_rsfmri['MeanFD'].quantile(0.75):.3f}]",
+    "Mean (Std)": f"{df_rsfmri['MeanFD'].mean():.3f} ({df_rsfmri['MeanFD'].std():.3f})"
+}, {
+    "Metric / Parameter": "rs-fMRI Max Framewise Displacement (MaxFD, mm)",
+    "Total Scans (N)": f"{len(df_rsfmri):,}",
+    "Unique Participants": f"{df_rsfmri['PATNO'].nunique():,}",
+    "Median [IQR]": f"{df_rsfmri['MaxFD'].median():.3f} [{df_rsfmri['MaxFD'].quantile(0.25):.3f}, {df_rsfmri['MaxFD'].quantile(0.75):.3f}]",
+    "Mean (Std)": f"{df_rsfmri['MaxFD'].mean():.3f} ({df_rsfmri['MaxFD'].std():.3f})"
+}, {
+    "Metric / Parameter": "rs-fMRI Scan Volume Length (TotalVolumes)",
+    "Total Scans (N)": f"{len(df_rsfmri):,}",
+    "Unique Participants": f"{df_rsfmri['PATNO'].nunique():,}",
+    "Median [IQR]": f"{df_rsfmri['TotalVolumes'].median():.0f} [{df_rsfmri['TotalVolumes'].quantile(0.25):.0f}, {df_rsfmri['TotalVolumes'].quantile(0.75):.0f}]",
+    "Mean (Std)": f"{df_rsfmri['TotalVolumes'].mean():.1f} ({df_rsfmri['TotalVolumes'].std():.1f})"
+}])
+print("Table 8.5A: Resting-State fMRI Head-Motion Framewise Displacement & Acquisition Summary:")
+display(rs_summary)
+
+# Targeted Synaptic Density (SV2A) & Tau Molecular PET Imaging
+df_sv2a_raw = pd.read_csv(repo_root / "PET" / "SV2A_PET_SUVR_Analysis_09Nov2026.csv", low_memory=False)
+sv2a_put = df_sv2a_raw[(df_sv2a_raw["SV2A_REGION"] == "PUTAMEN_L") & (df_sv2a_raw["EVENT_ID"] == "BL")][["PATNO", "SV2A_SUVR_CS"]].drop_duplicates("PATNO")
+
+df_tau_raw = pd.read_csv(repo_root / "PET" / "TAU_PET_Analysis_09Nov2026.csv", low_memory=False)
+tau_scans = df_tau_raw[["PATNO", "TAU_SUVR_CBM"]].dropna().drop_duplicates("PATNO")
+
+sv2a_stats = pd.DataFrame([{
+    "Tracer / Target": "18F-SynVesT-1 (SV2A) Putamen SUVR",
+    "Evaluated Scans (N)": f"{len(sv2a_put):,}",
+    "Valid Measurements (N)": f"{sv2a_put['SV2A_SUVR_CS'].count():,}",
+    "Median [IQR]": f"{sv2a_put['SV2A_SUVR_CS'].median():.2f} [{sv2a_put['SV2A_SUVR_CS'].quantile(0.25):.2f}, {sv2a_put['SV2A_SUVR_CS'].quantile(0.75):.2f}]",
+    "Reference Region": "Centrum Semiovale (CS)"
+}])
+print("\nTable 8.5B: 18F-SynVesT-1 (SV2A) Putamen SUVR Summary:")
+display(sv2a_stats)
+
+tau_stats = pd.DataFrame([{
+    "Tracer / Target": "18F-PI-2620 (Tau) Braak Stage 6 SUVR",
+    "Evaluated Scans (N)": f"{len(tau_scans):,}",
+    "Valid Measurements (N)": f"{tau_scans['TAU_SUVR_CBM'].count():,}",
+    "Median [IQR]": f"{tau_scans['TAU_SUVR_CBM'].median():.2f} [{tau_scans['TAU_SUVR_CBM'].quantile(0.25):.2f}, {tau_scans['TAU_SUVR_CBM'].quantile(0.75):.2f}]",
+    "Reference Region": "Cerebellar Gray Matter (CBM)"
+}])
+print("\nTable 8.5C: 18F-PI-2620 (Tau) Braak Stage 6 SUVR Summary:")
+display(tau_stats)"""
+    ))
+
+    # 8.6 Consolidated Join Audits for Deep Imaging Merges
+    cells.append(nbf.v4.new_code_cell(
+r"""# Section 8.6: Consolidated Join Audits for Deep Neuroimaging Merges
+all_imaging_audits = pd.concat([sbr_join_audit, mri_join_audit, dti_join_audit, audit_dat, audit_cth, audit_mriqc], ignore_index=True)
+print("Table 8.6: Consolidated Relational Join Audits for Native Imaging Datasets:")
+display(all_imaging_audits)"""
+    ))
+
+    # 8.7 Comprehensive Distribution Shape and Skewness
+    cells.append(nbf.v4.new_markdown_cell(
+r"""### 8.7 Comprehensive Distribution Shape and Skewness of Analyzed Neuroimaging Variables
+
+To assess distributional normality, structural volumetric spread, and binding ratio symmetry across all core and extended imaging modalities, Fisher–Pearson sample skewness was computed across all 20 analyzed continuous neuroimaging metrics:
 $$g_1 = \frac{n}{(n-1)(n-2)} \sum_{i=1}^n \left(\frac{x_i - \bar{x}}{s}\right)^3$$
 
 Descriptive shape classifications follow standard thresholds:
@@ -482,71 +805,93 @@ Descriptive shape classifications follow standard thresholds:
     ))
 
     cells.append(nbf.v4.new_code_cell(
-"""# Table: Distribution Shape and Skewness of Analyzed Neuroimaging Variables
+r"""# Table 8.7: Comprehensive Distribution Shape and Skewness of Analyzed Neuroimaging Variables
 from ppmi_pipeline.reporting.notebook_support import numeric_skewness_summary
 
+n_sbr = len(df_sbr_merged)
+n_mri = len(df_mri_merged)
+n_dti = len(df_dti_merged)
+n_av133 = len(df_av133)
+n_cth = len(merged_cth)
+n_mriqc = len(merged_mriqc)
+n_rs = len(df_rsfmri)
+n_sv2a = len(sv2a_put)
+n_tau = len(tau_scans)
+
 skew_specs = [
-    {"domain": "Neuroimaging", "variable": "PUTAMEN_REF_CWM", "grain": "Baseline SPECT Scans (SBR)", "series": df_sbr_merged["PUTAMEN_REF_CWM"]},
-    {"domain": "Neuroimaging", "variable": "CAUDATE_REF_CWM", "grain": "Baseline SPECT Scans (SBR)", "series": df_sbr_merged["CAUDATE_REF_CWM"]},
-    {"domain": "Neuroimaging", "variable": "STRIATUM_REF_CWM", "grain": "Baseline SPECT Scans (SBR)", "series": df_sbr_merged["STRIATUM_REF_CWM"]},
-    {"domain": "Neuroimaging", "variable": "putamen_asymmetry", "grain": "Baseline SPECT Scans (Ratio)", "series": df_sbr_merged["putamen_asymmetry"]},
-    {"domain": "Neuroimaging", "variable": "Bilateral_Hippocampus", "grain": "Baseline 3D T1 MRI Scans (mm^3)", "series": df_mri_merged["Bilateral_Hippocampus"]},
-    {"domain": "Neuroimaging", "variable": "Bilateral_Lateral_Ventricles", "grain": "Baseline 3D T1 MRI Scans (mm^3)", "series": df_mri_merged["Bilateral_Lateral_Ventricles"]},
-    {"domain": "Neuroimaging", "variable": "BrainSegVol", "grain": "Baseline 3D T1 MRI Scans (mm^3)", "series": df_mri_merged["BrainSegVol"]},
-    {"domain": "Neuroimaging", "variable": "DTI_ROI1_FA", "grain": "Baseline DTI Scans (FA)", "series": df_dti_merged["ROI1"]},
-    {"domain": "Neuroimaging", "variable": "DTI_ROI2_FA", "grain": "Baseline DTI Scans (FA)", "series": df_dti_merged["ROI2"]},
-    {"domain": "Neuroimaging", "variable": "PET_AV133_Caudate", "grain": "18F-AV-133 PET Scans (SBR)", "series": df_av133["PET_RCAUD_S"]},
-    {"domain": "Neuroimaging", "variable": "PET_AV133_Putamen", "grain": "18F-AV-133 PET Scans (SBR)", "series": df_av133["PET_RPUTANT_S"]}
+    # 11 Core Imaging Modality Variables
+    {"domain": "Neuroimaging", "variable": "PUTAMEN_REF_CWM", "grain": f"Baseline SPECT Scans (N={n_sbr:,})", "series": df_sbr_merged["PUTAMEN_REF_CWM"], "total_n": n_sbr},
+    {"domain": "Neuroimaging", "variable": "CAUDATE_REF_CWM", "grain": f"Baseline SPECT Scans (N={n_sbr:,})", "series": df_sbr_merged["CAUDATE_REF_CWM"], "total_n": n_sbr},
+    {"domain": "Neuroimaging", "variable": "STRIATUM_REF_CWM", "grain": f"Baseline SPECT Scans (N={n_sbr:,})", "series": df_sbr_merged["STRIATUM_REF_CWM"], "total_n": n_sbr},
+    {"domain": "Neuroimaging", "variable": "putamen_asymmetry", "grain": f"Baseline SPECT Scans (N={n_sbr:,})", "series": df_sbr_merged["putamen_asymmetry"], "total_n": n_sbr},
+    {"domain": "Neuroimaging", "variable": "Bilateral_Hippocampus", "grain": f"Baseline 3D T1 MRI Scans (N={n_mri:,})", "series": df_mri_merged["Bilateral_Hippocampus"], "total_n": n_mri},
+    {"domain": "Neuroimaging", "variable": "Bilateral_Lateral_Ventricles", "grain": f"Baseline 3D T1 MRI Scans (N={n_mri:,})", "series": df_mri_merged["Bilateral_Lateral_Ventricles"], "total_n": n_mri},
+    {"domain": "Neuroimaging", "variable": "BrainSegVol", "grain": f"Baseline 3D T1 MRI Scans (N={n_mri:,})", "series": df_mri_merged["BrainSegVol"], "total_n": n_mri},
+    {"domain": "Neuroimaging", "variable": "DTI_ROI1_FA", "grain": f"Baseline DTI Scans (N={n_dti:,})", "series": df_dti_merged["ROI1"], "total_n": n_dti},
+    {"domain": "Neuroimaging", "variable": "DTI_ROI2_FA", "grain": f"Baseline DTI Scans (N={n_dti:,})", "series": df_dti_merged["ROI2"], "total_n": n_dti},
+    {"domain": "Neuroimaging", "variable": "PET_AV133_Caudate", "grain": f"18F-AV-133 PET Scans (N={n_av133:,})", "series": df_av133["PET_RCAUD_S"], "total_n": n_av133},
+    {"domain": "Neuroimaging", "variable": "PET_AV133_Putamen", "grain": f"18F-AV-133 PET Scans (N={n_av133:,})", "series": df_av133["PET_RPUTANT_S"], "total_n": n_av133},
+
+    # 9 Extended Source-File Variables
+    {"domain": "Neuroimaging (Deep)", "variable": "lh_entorhinal", "grain": f"Baseline 3D T1 MRI Scans (N={n_cth:,})", "series": merged_cth["lh_entorhinal"], "total_n": n_cth},
+    {"domain": "Neuroimaging (Deep)", "variable": "lh_precentral", "grain": f"Baseline 3D T1 MRI Scans (N={n_cth:,})", "series": merged_cth["lh_precentral"], "total_n": n_cth},
+    {"domain": "Neuroimaging (Deep)", "variable": "cnr", "grain": f"Baseline MRIQC Scans (N={n_mriqc:,})", "series": merged_mriqc["cnr"], "total_n": n_mriqc},
+    {"domain": "Neuroimaging (Deep)", "variable": "cjv", "grain": f"Baseline MRIQC Scans (N={n_mriqc:,})", "series": merged_mriqc["cjv"], "total_n": n_mriqc},
+    {"domain": "Neuroimaging (Deep)", "variable": "efc", "grain": f"Baseline MRIQC Scans (N={n_mriqc:,})", "series": merged_mriqc["efc"], "total_n": n_mriqc},
+    {"domain": "Neuroimaging (Deep)", "variable": "fber", "grain": f"Baseline MRIQC Scans (N={n_mriqc:,})", "series": merged_mriqc["fber"], "total_n": n_mriqc},
+    {"domain": "Neuroimaging (Deep)", "variable": "rsfmri_mean_fd", "grain": f"rs-fMRI Scans (MeanFD, N={n_rs:,})", "series": df_rsfmri["MeanFD"], "total_n": n_rs},
+    {"domain": "Neuroimaging (Deep)", "variable": "sv2a_suvr", "grain": f"Baseline SV2A PET Scans (N={n_sv2a:,})", "series": sv2a_put["SV2A_SUVR_CS"], "total_n": n_sv2a},
+    {"domain": "Neuroimaging (Deep)", "variable": "tau_suvr", "grain": f"Exploratory Tau PET Scans (N={n_tau:,})", "series": tau_scans["TAU_SUVR_CBM"], "total_n": n_tau}
 ]
 
 skewness_df = numeric_skewness_summary(skew_specs)
-print("Table: Distribution Shape and Skewness of Analyzed Neuroimaging Variables:")
+print("Table 8.7: Comprehensive Distribution Shape and Skewness of Analyzed Neuroimaging Variables:")
 display(skewness_df)"""
     ))
 
-    # Section 8: Results-Driven Interpretation
+    # Section 9: Results-Driven Interpretation
     cells.append(nbf.v4.new_markdown_cell(
-r"""## 8. Results-Driven Interpretation Generated from Computed Aggregates
+r"""## 9. Results-Driven Interpretation Generated from Computed Aggregates
 
 Based on the empirical neuroimaging analyses:
 
-1. **DaTscan Striatal Binding Degradation**:
-   - De novo idiopathic Parkinson's disease participants demonstrate profound striatal binding reduction at baseline (putamen SBR median $\approx 0.7–0.9$), in contrast to healthy controls (putamen SBR median $\approx 1.8–2.2$).
-   - Putamen binding exhibits marked bilateral asymmetry in early PD, reflecting typical asymmetric dopaminergic loss.
-   - SWEDD participants exhibit preserved striatal binding (median putamen SBR $\approx 1.7–2.0$), descriptively comparable to healthy controls.
-   - Prodromal participants demonstrate an intermediate distribution, consistent with varying degrees of presynaptic dopaminergic loss.
-2. **Visual vs Quantitative Concordance**:
-   - Central visual interpretation shows high biological concordance with quantitative SBR: scans read as 'negative' display preserved putamen binding, whereas 'positive' scans align with quantified deficit.
+1. **DaTscan Striatal Binding Differences**:
+   - De novo idiopathic Parkinson's disease participants exhibit lower striatal binding values at baseline (putamen SBR median $\approx 0.7–0.9$), compared to healthy controls (putamen SBR median $\approx 1.8–2.2$).
+   - Putamen binding exhibits bilateral differences in de novo PD.
+   - SWEDD participants exhibit striatal binding values (median putamen SBR $\approx 1.7–2.0$) descriptively comparable to healthy controls.
+   - Prodromal participants exhibit an intermediate distribution across the analyzed baseline cohort.
+2. **Visual vs Quantitative Alignment**:
+   - Central visual classifications align descriptively with quantitative SBR: scans read as 'negative' display higher putamen binding, whereas 'positive' scans correspond to lower quantified putamen SBR.
 3. **Structural MRI Subcortical Patterns**:
    - Hippocampal and subcortical volume distributions show substantial overlap across cohorts at baseline; unadjusted comparisons do not control for intracranial volume (ICV), age, sex, scanner manufacturer, or acquisition site differences.
    - Ventricular volume displays expected age-associated expansion across cohorts.
 4. **DTI ROI Microstructure**:
    - Manual ROI Fractional Anisotropy in substantia nigra shows overlapping distributions across cohorts; these unadjusted summaries do not control for age or diffusion acquisition protocol differences.
 5. **PET Molecular Substudies**:
-   - 18F-AV-133 VMAT2 imaging independently corroborates presynaptic vesicular monoamine transporter loss, aligning with DaTscan findings."""
+   - In exploratory 18F-AV-133 VMAT2 imaging, lower vesicular monoamine transporter binding values are observed in PD relative to controls in the available sample."""
     ))
 
-    # Section 9: Limitations, Multi-Site Scanner Heterogeneity, Confounding
+    # Section 10: Limitations, Multi-Site Scanner Heterogeneity, Confounding
     cells.append(nbf.v4.new_markdown_cell(
-r"""## 9. Limitations, Scanner Heterogeneity, and Confounding
+r"""## 10. Limitations, Scanner Heterogeneity, and Confounding
 
 1. **Multi-Center Scanner & Camera Heterogeneity**: DaTscan SPECT and structural MRI data were acquired across more than 30 international imaging centers utilizing disparate gamma cameras, collimators, and MRI scanner platforms (1.5T and 3.0T). While core laboratories apply standard reconstruction filters, residual scanner-specific variance remains.
 2. **Manual ROI Provenance vs. Tractography in DTI**: PPMI DTI data in this cut represent manual planar region-of-interest extractions. In strict adherence to scientific accuracy, these results reflect regional diffusion metrics rather than reconstructed probabilistic tractography streamlines.
 3. **PET Sample Scoping**: Exploratory PET substudies (AV-133, DPA-714, C05-05) were performed in targeted substudy cohorts and possess smaller sample sizes than core DaTscan and structural MRI collections."""
     ))
 
-    # Section 10: Conclusions Grounded in Displayed Results
+    # Section 11: Conclusions Grounded in Displayed Results
     cells.append(nbf.v4.new_markdown_cell(
-r"""## 10. Conclusions Grounded in Displayed Results
+r"""## 11. Conclusions Grounded in Displayed Results
 
-1. **Definitive Diagnostic Stratification**: DaTscan quantitative SBR cleanly differentiates de novo PD from healthy controls and SWEDD, with high visual read concordance.
+1. **Striatal Binding Differences Across Cohorts**: DaTscan quantitative SBR exhibits differences between de novo PD, healthy controls, and SWEDD participants, corresponding descriptively to central visual read classifications.
 2. **Structural Volumetrics in Early PD**: Structural MRI FreeSurfer structural volumes were descriptively similar in the displayed unadjusted sample.
-3. **Multimodal Coherence**: SPECT, MRI, DTI, and PET datasets provide complementary structural and molecular perspectives, validated and ready for multimodal synthesis."""
+3. **Multimodal Measurements**: SPECT, MRI, DTI, and PET datasets capture distinct structural and molecular imaging measurements across the analyzed cohorts."""
     ))
 
-    # Section 11: Reproducibility and Privacy Validation Summary
+    # Section 12: Reproducibility and Privacy Validation Summary
     cells.append(nbf.v4.new_markdown_cell(
-r"""## 11. Reproducibility and Privacy Validation Summary
+r"""## 12. Reproducibility and Privacy Validation Summary
 
 - **Participant Privacy**: All displayed tables represent cohort aggregates ($N$, medians, IQRs, percentages). Zero participant identifiers (`PATNO`), scan IDs, or individual DICOM paths are displayed.
 - **Reproducibility**: The code cell below programmatically certifies privacy compliance via `PrivacyGuard`."""

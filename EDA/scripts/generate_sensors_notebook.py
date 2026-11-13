@@ -102,12 +102,16 @@ from ppmi_pipeline.reporting.notebook_support import (
     build_selected_sources_table,
     render_html_column_dictionaries,
     setup_publication_theme,
-    privacy_safe_aggregate_summary
+    privacy_safe_aggregate_summary,
+    audit_and_merge,
+    build_deep_csv_inventory_table
 )
 from ppmi_pipeline.reporting.privacy import PrivacyGuard
 
 # Configure publication aesthetics
 setup_publication_theme()
+pd.set_option("display.max_colwidth", None)
+pd.set_option("display.max_columns", None)
 root_path = resolve_repo_root()
 print(f"Pipeline environment initialized. Root: {root_path}")
 print(f"Timestamp: {datetime.datetime.now(datetime.timezone.utc).isoformat()}")"""
@@ -366,9 +370,305 @@ plt.tight_layout()
 plt.show()"""
     ))
 
-    # 7.4 Distribution Shape and Skewness
+    # Section 8: Deep Source-File Exploratory Data Analysis (CSV Extension)
     cells.append(nbf.v4.new_markdown_cell(
-r"""### 7.4 Distribution Shape and Skewness of Analyzed Numeric Variables
+r"""## 8. Deep Source-File Exploratory Data Analysis (CSV Extension)
+
+In compliance with `docs/phase_specs/deep_csv_eda_extension.md`, this section provides targeted exploratory profiling of native Roche mobile telemetry:
+1. **Telemetry Inventory & Grain Audit**: Formal cataloging of high-frequency sensor streams, observation grain (`(PATNO, QRSCATID, QRSTSTID, QRSDTM)`), and documentation references (`digital_Sensor/PPMI_Methods_Document_Roche_v1.1.pdf`).
+2. **Monitoring Cadence & Participant Retention**: Granular assessment of records per participant, active monitoring days, observation span, and inter-assessment intervals across the study period.
+3. **Exploratory Variance Partitioning (One-Way Random-Effects ICC)**: Partitioning of observed feature variance into between-participant ($s_b^2$) and within-participant ($s_w^2$) components to evaluate measurement repeatability in this pilot substudy cohort.
+4. **Paired Bilateral Motor Task Assessment & Laterality**: Assessment of performance and relative asymmetry between left and right hand active tests (`HT`, `PTT`) on paired test sessions.
+5. **Relational Join Audits**: Verification of 1:1 participant alignment between the sensor substudy and the curated baseline clinical cohort, and 1:1 pairing of bilateral motor tasks."""
+    ))
+
+    # 8.1 Priority Digital Sensor Source CSV Inventory
+    cells.append(nbf.v4.new_code_cell(
+r"""# Table 8.1: Priority Digital Sensor Source CSV Inventory
+deep_sensor_specs = [
+    {
+        "path": "digital_Sensor/Roche_PD_Monitoring_App_v2_data_09Nov2026.csv",
+        "grain": "Measurement-level (PATNO, QRSCATID, QRSTSTID, QRSDTM)",
+        "grain_keys": ["PATNO", "QRSCATID", "QRSTSTID", "QRSDTM"],
+        "doc_source": "digital_Sensor/PPMI_Methods_Document_Roche_v1.1.pdf (pp. 12-16)",
+        "documentation": {
+            "doc_path": "digital_Sensor/PPMI_Methods_Document_Roche_v1.1.pdf",
+            "locator": {"page_range": (12, 16)},
+            "evidence_terms": ["Maximum Hand Turn Speed", "Total Power"]
+        },
+        "scientific_purpose": "High-frequency smartphone telemetry capturing active motor tests, tremor, voice, and daily diaries."
+    }
+]
+
+df_deep_sensor = build_deep_csv_inventory_table(deep_sensor_specs)
+pd.set_option("display.max_colwidth", None)
+print("Table 8.1: Priority Digital Sensor Source CSV Inventory (PPMI Public Release 09Nov2026):")
+display(df_deep_sensor)"""
+    ))
+
+    # 8.2 Cadence & Longitudinal Retention
+    cells.append(nbf.v4.new_markdown_cell(
+r"""### 8.2 Participant Monitoring Cadence & Longitudinal Retention
+We evaluate longitudinal engagement across the monitoring period: observation span (days between first and last recorded assessment) and inter-assessment intervals (days between successive active test sessions)."""
+    ))
+
+    cells.append(nbf.v4.new_code_cell(
+r"""# Table 8.2: Participant Telemetry Cadence & Longitudinal Retention
+df_sensor['dt'] = pd.to_datetime(df_sensor['QRSDTM'].str[:10], errors='coerce')
+pts_cadence = df_sensor.groupby('PATNO').agg(
+    first_dt=('dt', 'min'),
+    last_dt=('dt', 'max'),
+    n_days=('dt', lambda s: s.nunique()),
+    n_rec=('QRSCATID', 'count')
+)
+pts_cadence['span_days'] = (pts_cadence['last_dt'] - pts_cadence['first_dt']).dt.days + 1
+
+# Inter-assessment intervals in days
+intervals = []
+for p, g in df_sensor.groupby('PATNO'):
+    dts = g['dt'].dropna().drop_duplicates().sort_values()
+    if len(dts) > 1:
+        diffs = dts.diff().dropna().dt.days
+        intervals.extend(diffs.tolist())
+intervals = np.array(intervals)
+
+span_med = pts_cadence['span_days'].median()
+span_q25, span_q75 = np.percentile(pts_cadence['span_days'], [25, 75])
+
+int_med = np.median(intervals)
+int_q25, int_q75 = np.percentile(intervals, [25, 75])
+
+cadence_rows = [
+    {"Cadence Dimension": "Total Records per Participant", "Median [IQR]": f"{rec_med:,.1f} [{rec_q25:,.1f}, {rec_q75:,.1f}]", "Min - Max": f"{pts_cadence['n_rec'].min():,} - {pts_cadence['n_rec'].max():,}", "Unique Participants": n_pts},
+    {"Cadence Dimension": "Active Assessment Days per Participant", "Median [IQR]": f"{day_med:,.1f} [{day_q25:,.1f}, {day_q75:,.1f}]", "Min - Max": f"{pts_cadence['n_days'].min()} - {pts_cadence['n_days'].max()}", "Unique Participants": n_pts},
+    {"Cadence Dimension": "Total Observation Span (Days)", "Median [IQR]": f"{span_med:,.1f} [{span_q25:,.1f}, {span_q75:,.1f}]", "Min - Max": f"{pts_cadence['span_days'].min():.0f} - {pts_cadence['span_days'].max():.0f}", "Unique Participants": n_pts},
+    {"Cadence Dimension": "Inter-Assessment Interval (Days)", "Median [IQR]": f"{int_med:,.1f} [{int_q25:,.1f}, {int_q75:,.1f}]", "Min - Max": f"{intervals.min():.0f} - {intervals.max():.0f}", "Unique Participants": n_pts}
+]
+
+df_cadence_summary = pd.DataFrame(cadence_rows)
+print("Table 8.2: Participant Telemetry Cadence & Longitudinal Retention:")
+display(df_cadence_summary)"""
+    ))
+
+    # 8.3 Variance Partitioning
+    cells.append(nbf.v4.new_markdown_cell(
+r"""### 8.3 Exploratory Measurement Repeatability & Variance Partitioning (One-Way Random-Effects ICC)
+
+Repeated longitudinal measurements within participants allow decomposing total observed feature variance into **between-participant variance** ($\sigma_b^2$) and **within-participant variance** ($\sigma_w^2$) under a one-way random-effects model ($ICC(1,1)$):
+$$ICC = \frac{\sigma_b^2}{\sigma_b^2 + \sigma_w^2}$$
+
+*Analytical Model & Methodological Notes:*
+- Evaluated as an exploratory measurement-repeatability estimate under a one-way random-effects model across the pilot telemetry cohort ($N=32$ participants).
+- It does not account for long-term time trends, circadian/diurnal variation, or unobserved daily environmental covariates.
+- An $ICC > 0.70$ indicates that between-participant differentiation exceeds short-term within-participant measurement variability.
+- An $ICC < 0.40$ reflects that the measure is dominated by short-term within-participant fluctuation or episodic variability (e.g. resting/postural tremor bursts)."""
+    ))
+
+    cells.append(nbf.v4.new_code_cell(
+r"""# Table 8.3: Exploratory Variance Partitioning and Intraclass Correlation Coefficients (ICC)
+def compute_variance_components(data, group_col, val_col):
+    pts = data[group_col].unique()
+    k = len(pts)
+    n_total = len(data)
+    grand_mean = data[val_col].mean()
+    
+    grp = data.groupby(group_col)[val_col]
+    means = grp.mean()
+    counts = grp.count()
+    
+    ss_b = (counts * (means - grand_mean)**2).sum()
+    df_b = k - 1
+    ms_b = ss_b / df_b if df_b > 0 else 0.0
+    
+    ss_w = grp.apply(lambda x: ((x - x.mean())**2).sum()).sum()
+    df_w = n_total - k
+    ms_w = ss_w / df_w if df_w > 0 else 0.0
+    
+    n_0 = (n_total - (counts**2).sum() / n_total) / (k - 1)
+    s2_b = max(0.0, (ms_b - ms_w) / n_0)
+    s2_w = ms_w
+    icc = s2_b / (s2_b + s2_w) if (s2_b + s2_w) > 0 else 0.0
+    pct_b = (s2_b / (s2_b + s2_w) * 100) if (s2_b + s2_w) > 0 else 0.0
+    pct_w = (s2_w / (s2_b + s2_w) * 100) if (s2_b + s2_w) > 0 else 0.0
+    return k, n_total, s2_b, s2_w, icc, pct_b, pct_w
+
+# Variance partitioning for Hand Turn Speed
+k_ht, n_ht_tot, s2_b_ht, s2_w_ht, icc_ht, pct_b_ht, pct_w_ht = compute_variance_components(df_ht, 'PATNO', 'QRSRESN')
+
+# Variance partitioning for Log10 Postural Tremor Power
+df_ptt_valid = df_ptt[df_ptt['QRSRESN'] > 0].copy()
+df_ptt_valid['log_power'] = np.log10(df_ptt_valid['QRSRESN'])
+k_ptt, n_ptt_tot, s2_b_ptt, s2_w_ptt, icc_ptt, pct_b_ptt, pct_w_ptt = compute_variance_components(df_ptt_valid, 'PATNO', 'log_power')
+
+var_rows = [
+    {
+        "Task / Metric Name": "Hand Turn Maximum Speed (rad/s)",
+        "Valid Measurements (N)": f"{n_ht_tot:,}",
+        "Unique Participants": k_ht,
+        "Between-Subject Variance (s_b^2)": f"{s2_b_ht:.3f}",
+        "Within-Subject Variance (s_w^2)": f"{s2_w_ht:.3f}",
+        "% Between-Subject": f"{pct_b_ht:.1f}%",
+        "% Within-Subject": f"{pct_w_ht:.1f}%",
+        "Intraclass Correlation (ICC)": f"{icc_ht:.3f}"
+    },
+    {
+        "Task / Metric Name": "Postural Tremor Power (Log10 m^2/s^3)",
+        "Valid Measurements (N)": f"{n_ptt_tot:,}",
+        "Unique Participants": k_ptt,
+        "Between-Subject Variance (s_b^2)": f"{s2_b_ptt:.3f}",
+        "Within-Subject Variance (s_w^2)": f"{s2_w_ptt:.3f}",
+        "% Between-Subject": f"{pct_b_ptt:.1f}%",
+        "% Within-Subject": f"{pct_w_ptt:.1f}%",
+        "Intraclass Correlation (ICC)": f"{icc_ptt:.3f}"
+    }
+]
+
+df_var_summary = pd.DataFrame(var_rows)
+print("Table 8.3: Exploratory Variance Partitioning and Intraclass Correlation Coefficients (ICC):")
+display(df_var_summary)
+
+# Figure 4: Variance Partitioning Proportions
+plt.figure(figsize=(7.5, 4.2))
+tasks = ["Hand Turn Speed", "Postural Tremor (Log10)"]
+between_props = [pct_b_ht, pct_b_ptt]
+within_props = [pct_w_ht, pct_w_ptt]
+
+p1 = plt.bar(tasks, between_props, width=0.45, color='#2b5c8f', alpha=0.85, label='Between-Subject Variance (% of total)')
+p2 = plt.bar(tasks, within_props, bottom=between_props, width=0.45, color='#ff7f0e', alpha=0.85, label='Within-Subject Variance (% of total)')
+
+for i, (b_p, w_p) in enumerate(zip(between_props, within_props)):
+    plt.text(i, b_p / 2, f"{b_p:.1f}%\n(ICC={var_rows[i]['Intraclass Correlation (ICC)']})", ha='center', va='center', color='white', fontweight='bold', fontsize=9)
+    plt.text(i, b_p + w_p / 2, f"{w_p:.1f}%", ha='center', va='center', color='white', fontweight='bold', fontsize=9)
+
+plt.title("Figure 4: Exploratory Variance Partitioning of Kinematic Sensor Measures", fontsize=11, fontweight='bold', pad=12)
+plt.ylabel("Proportion of Total Variance (%)", fontsize=10, fontweight='bold')
+plt.ylim(0, 105)
+plt.legend(loc='upper right')
+plt.grid(True, linestyle='--', alpha=0.5, axis='y')
+plt.tight_layout()
+plt.show()"""
+    ))
+
+    # 8.4 Sensor Laterality Assessment
+    cells.append(nbf.v4.new_markdown_cell(
+r"""### 8.4 Paired Bilateral Motor Task Assessment & Laterality
+
+Motor symptoms in Parkinson's disease characteristically manifest with asymmetric presentation. The Roche app assesses active motor tasks bilaterally (`QRSLAT` = `RIGHT` vs. `LEFT`). Rather than comparing unpaired marginal distributions, we pair LEFT and RIGHT tests performed during the same testing session (`PATNO`, `QRSTSTID`, `QRSDTM`, `QRSDTM_TIME`) to compute session-level relative asymmetry:
+$$\text{Asymmetry Index} = \frac{|\text{Right} - \text{Left}|}{(\text{Right} + \text{Left}) / 2}$$"""
+    ))
+
+    cells.append(nbf.v4.new_code_cell(
+r"""# Table 8.4: Paired Bilateral Motor Task Assessment & Session-Level Laterality
+# Hand Turn (HT): Pair LEFT and RIGHT active tests performed during the same test session
+# For repeat attempts within the same session timestamp, select the final completed attempt
+df_ht_valid = df_ht.dropna(subset=['QRSRESN', 'PATNO', 'QRSTSTID', 'QRSDTM', 'QRSDTM_TIME']).copy()
+ht_l = (
+    df_ht_valid[df_ht_valid['QRSLAT'] == 'LEFT']
+    .sort_values('QRSSTDTC_TIME')
+    .groupby(['PATNO', 'QRSTSTID', 'QRSDTM', 'QRSDTM_TIME'])
+    .last()
+    .reset_index()[['PATNO', 'QRSTSTID', 'QRSDTM', 'QRSDTM_TIME', 'QRSRESN']]
+    .rename(columns={'QRSRESN': 'speed_left'})
+)
+ht_r = (
+    df_ht_valid[df_ht_valid['QRSLAT'] == 'RIGHT']
+    .sort_values('QRSSTDTC_TIME')
+    .groupby(['PATNO', 'QRSTSTID', 'QRSDTM', 'QRSDTM_TIME'])
+    .last()
+    .reset_index()[['PATNO', 'QRSTSTID', 'QRSDTM', 'QRSDTM_TIME', 'QRSRESN']]
+    .rename(columns={'QRSRESN': 'speed_right'})
+)
+
+paired_ht, audit_ht_lat = audit_and_merge(
+    left_df=ht_l,
+    right_df=ht_r,
+    on=['PATNO', 'QRSTSTID', 'QRSDTM', 'QRSDTM_TIME'],
+    expected_cardinality='1:1',
+    how='inner',
+    left_name='HT_Left_Hand',
+    right_name='HT_Right_Hand'
+)
+paired_ht['asymmetry_index'] = (paired_ht['speed_right'] - paired_ht['speed_left']).abs() / ((paired_ht['speed_right'] + paired_ht['speed_left']) / 2)
+
+# Postural Tremor (PTT): Pair LEFT and RIGHT active tests performed during the same test session
+df_ptt_valid_lat = df_ptt.dropna(subset=['QRSRESN', 'PATNO', 'QRSTSTID', 'QRSDTM', 'QRSDTM_TIME']).copy()
+ptt_l = (
+    df_ptt_valid_lat[df_ptt_valid_lat['QRSLAT'] == 'LEFT']
+    .sort_values('QRSSTDTC_TIME')
+    .groupby(['PATNO', 'QRSTSTID', 'QRSDTM', 'QRSDTM_TIME'])
+    .last()
+    .reset_index()[['PATNO', 'QRSTSTID', 'QRSDTM', 'QRSDTM_TIME', 'QRSRESN']]
+    .rename(columns={'QRSRESN': 'power_left'})
+)
+ptt_r = (
+    df_ptt_valid_lat[df_ptt_valid_lat['QRSLAT'] == 'RIGHT']
+    .sort_values('QRSSTDTC_TIME')
+    .groupby(['PATNO', 'QRSTSTID', 'QRSDTM', 'QRSDTM_TIME'])
+    .last()
+    .reset_index()[['PATNO', 'QRSTSTID', 'QRSDTM', 'QRSDTM_TIME', 'QRSRESN']]
+    .rename(columns={'QRSRESN': 'power_right'})
+)
+
+paired_ptt, audit_ptt_lat = audit_and_merge(
+    left_df=ptt_l,
+    right_df=ptt_r,
+    on=['PATNO', 'QRSTSTID', 'QRSDTM', 'QRSDTM_TIME'],
+    expected_cardinality='1:1',
+    how='inner',
+    left_name='PTT_Left_Hand',
+    right_name='PTT_Right_Hand'
+)
+paired_ptt['asymmetry_index'] = (paired_ptt['power_right'] - paired_ptt['power_left']).abs() / ((paired_ptt['power_right'] + paired_ptt['power_left']) / 2 + 1e-9)
+
+lat_rows = [
+    {
+        "Bilateral Assessment Task": "Hand Turn Maximum Speed (rad/s)",
+        "Paired Test Sessions (N)": f"{len(paired_ht):,}",
+        "Participants Represented": paired_ht['PATNO'].nunique(),
+        "Left Hand (Median [IQR])": f"{paired_ht['speed_left'].median():.2f} [{paired_ht['speed_left'].quantile(0.25):.2f}, {paired_ht['speed_left'].quantile(0.75):.2f}]",
+        "Right Hand (Median [IQR])": f"{paired_ht['speed_right'].median():.2f} [{paired_ht['speed_right'].quantile(0.25):.2f}, {paired_ht['speed_right'].quantile(0.75):.2f}]",
+        "Relative Asymmetry Index (Median [IQR])": f"{paired_ht['asymmetry_index'].median():.3f} [{paired_ht['asymmetry_index'].quantile(0.25):.3f}, {paired_ht['asymmetry_index'].quantile(0.75):.3f}]"
+    },
+    {
+        "Bilateral Assessment Task": "Postural Tremor Total Power (m^2/s^3)",
+        "Paired Test Sessions (N)": f"{len(paired_ptt):,}",
+        "Participants Represented": paired_ptt['PATNO'].nunique(),
+        "Left Hand (Median [IQR])": f"{paired_ptt['power_left'].median():.4f} [{paired_ptt['power_left'].quantile(0.25):.4f}, {paired_ptt['power_left'].quantile(0.75):.4f}]",
+        "Right Hand (Median [IQR])": f"{paired_ptt['power_right'].median():.4f} [{paired_ptt['power_right'].quantile(0.25):.4f}, {paired_ptt['power_right'].quantile(0.75):.4f}]",
+        "Relative Asymmetry Index (Median [IQR])": f"{paired_ptt['asymmetry_index'].median():.3f} [{paired_ptt['asymmetry_index'].quantile(0.25):.3f}, {paired_ptt['asymmetry_index'].quantile(0.75):.3f}]"
+    }
+]
+df_lat_summary = pd.DataFrame(lat_rows)
+print("Table 8.4: Paired Session Bilateral Motor Task Assessment & Laterality:")
+display(df_lat_summary)"""
+    ))
+
+    # 8.5 Consolidated Relational Join Audits
+    cells.append(nbf.v4.new_code_cell(
+r"""# Table 8.5: Consolidated Relational Join Audits (Cohort Alignment & Paired Laterality)
+f_curated = root_path / "curated_datacuts" / "PPMI_Curated_Data_Cut_Public_20260810(1).xlsx"
+df_curated = pd.read_excel(f_curated, sheet_name="20260810")
+df_bl = df_curated[df_curated['EVENT_ID'] == 'BL'][['PATNO', 'COHORT']].dropna().drop_duplicates('PATNO')
+
+pts_sensor = pd.DataFrame({'PATNO': df_sensor['PATNO'].unique()})
+merged_sensor_bl, audit_sensor_bl = audit_and_merge(
+    left_df=pts_sensor,
+    right_df=df_bl,
+    on=['PATNO'],
+    expected_cardinality='1:1',
+    how='inner',
+    left_name='Digital_Sensor_Cohort',
+    right_name='Curated_Baseline_Cohort'
+)
+
+consolidated_sensor_audits = pd.concat([audit_sensor_bl, audit_ht_lat, audit_ptt_lat], ignore_index=True)
+print("Table 8.5: Consolidated Relational Join Audits (Cohort Alignment & Paired Laterality):")
+display(consolidated_sensor_audits)"""
+    ))
+
+    # 8.6 Distribution Shape and Skewness
+    cells.append(nbf.v4.new_markdown_cell(
+r"""### 8.6 Distribution Shape and Skewness of Analyzed Numeric Variables
 
 To evaluate distributional symmetry and assess the necessity of logarithmic transforms for kinematic sensor measures, Fisher–Pearson sample skewness was computed across all analyzed numeric features and participant-level adherence indicators:
 $$g_1 = \frac{n}{(n-1)(n-2)} \sum_{i=1}^n \left(\frac{x_i - \bar{x}}{s}\right)^3$$
@@ -380,60 +680,77 @@ Descriptive shape classifications follow standard thresholds:
     ))
 
     cells.append(nbf.v4.new_code_cell(
-"""# Table: Distribution Shape and Skewness of Analyzed Sensor Variables
+r"""# Table 8.6: Distribution Shape and Skewness of Analyzed Sensor Variables
 from ppmi_pipeline.reporting.notebook_support import numeric_skewness_summary
 
+n_pts = len(pts_summary)
+n_ht = len(df_ht)
+n_ptt = len(df_ptt)
+n_intervals = len(intervals)
+n_ht_paired = len(paired_ht)
+n_ptt_paired = len(paired_ptt)
+
+raw_ptt = ptt_vals
+log_ptt = np.log10(raw_ptt.where(raw_ptt > 0))
+
 skew_specs = [
-    {"domain": "Digital Sensors", "variable": "records_per_participant", "grain": "Participant-level Adherence (N=32)", "series": pts_summary["total_records"]},
-    {"domain": "Digital Sensors", "variable": "active_days_per_participant", "grain": "Participant-level Adherence (N=32)", "series": pts_summary["distinct_dates"]},
-    {"domain": "Digital Sensors", "variable": "hand_turn_speed", "grain": "Active Motor Tests (rad/s)", "series": ht_vals},
-    {"domain": "Digital Sensors", "variable": "postural_tremor_power", "grain": "Active Motor Tests (Raw m^2/s^3)", "series": valid_ptt},
-    {"domain": "Digital Sensors", "variable": "log10_postural_tremor_power", "grain": "Active Motor Tests (Log10 m^2/s^3)", "series": np.log10(valid_ptt)}
+    {"domain": "Digital Sensors", "variable": "records_per_participant", "grain": f"Participant-level Adherence (N={n_pts:,})", "series": pts_summary["total_records"], "total_n": n_pts},
+    {"domain": "Digital Sensors", "variable": "active_days_per_participant", "grain": f"Participant-level Adherence (N={n_pts:,})", "series": pts_summary["distinct_dates"], "total_n": n_pts},
+    {"domain": "Digital Sensors", "variable": "span_days", "grain": f"Participant-level Monitoring Span (N={n_pts:,})", "series": pts_cadence["span_days"], "total_n": n_pts},
+    {"domain": "Digital Sensors", "variable": "inter_assessment_interval", "grain": f"Inter-Assessment Intervals (Days, N={n_intervals:,})", "series": intervals, "total_n": n_intervals},
+    {"domain": "Digital Sensors", "variable": "hand_turn_speed", "grain": f"Hand Turn Active Tests (rad/s, N={n_ht:,})", "series": ht_vals, "total_n": n_ht},
+    {"domain": "Digital Sensors", "variable": "postural_tremor_power", "grain": f"Postural Tremor Tests (Raw, N={n_ptt:,})", "series": raw_ptt, "total_n": n_ptt},
+    {"domain": "Digital Sensors", "variable": "log10_postural_tremor_power", "grain": f"Postural Tremor Tests (Log10, N={n_ptt:,})", "series": log_ptt, "total_n": n_ptt},
+    {"domain": "Digital Sensors", "variable": "paired_ht_asymmetry_index", "grain": f"Paired Hand Turn Sessions (N={n_ht_paired:,})", "series": paired_ht["asymmetry_index"], "total_n": n_ht_paired},
+    {"domain": "Digital Sensors", "variable": "paired_ptt_asymmetry_index", "grain": f"Paired Postural Tremor Sessions (N={n_ptt_paired:,})", "series": paired_ptt["asymmetry_index"], "total_n": n_ptt_paired}
 ]
 
+pd.set_option("display.max_colwidth", None)
 skewness_df = numeric_skewness_summary(skew_specs)
-print("Table: Distribution Shape and Skewness of Analyzed Sensor Variables:")
+print("Table 8.6: Distribution Shape and Skewness of Analyzed Sensor Variables:")
 display(skewness_df)"""
     ))
 
-    # Section 8: Results-Driven Interpretation
+    # Section 9: Results-Driven Interpretation
     cells.append(nbf.v4.new_markdown_cell(
-r"""## 8. Results-Driven Interpretation Generated from Computed Aggregates
+r"""## 9. Results-Driven Interpretation Generated from Computed Aggregates
 
 Based on the empirical digital telemetry results:
 
 1. **High-Frequency Observational Depth**:
-   - The Roche mobile app dataset captures $108,901$ telemetry observations across a focused substudy cohort ($N=32$ participants).
-   - Within-participant longitudinal assessment repetition is exceptional: 30 of the 32 participants ($93.8\%$) completed repeated assessment days, with a median of $8.5$ active testing days and over $4,000$ telemetry records per participant.
+   - As documented in Tables 8.1 and 8.2, the mobile telemetry substudy captures extensive observations across a focused pilot cohort.
+   - Participants demonstrated sustained longitudinal engagement, completing repeated active assessment sessions over several months.
 2. **Assessment Partitioning**:
    - Motor active tests (Draw-a-Shape, Tremor, Hand Turn) and non-motor daily surveys (Daily Diary, Health Survey) constitute the primary telemetry volume.
-   - Draw-a-Shape represents the single largest task category ($\approx 22\%$ of records), generating fine-grained spatial and kinematic data on fine motor control.
-3. **Sensor Feature Dispersion**:
-   - Hand Turn Speed displays a unimodal distribution with a median of $\approx 15–20\,rad/s$, sensitive to alternating forearm movement pace.
-   - Postural Tremor Power spans multiple orders of magnitude (log-normal distribution), capturing severe resting/postural tremor spikes against a low-power baseline."""
+   - Draw-a-Shape represents a primary active task category, generating fine-grained spatial and kinematic data on fine motor control.
+3. **Exploratory Variance Partitioning & Repeatability**:
+   - Evaluated under a one-way random-effects model, Hand Turn Speed exhibits higher between-participant differentiation relative to within-participant variance.
+   - In contrast, Postural Tremor Power ($\log_{10}$) exhibits substantial within-participant short-term variation, reflecting the episodic, fluctuating nature of tremor measurements over time.
+4. **Bilateral Motor Laterality**:
+   - Analysis of paired test sessions describes within-session asymmetry between hands across paired testing sessions."""
     ))
 
-    # Section 9: Limitations, Missing Documentation, Device Heterogeneity
+    # Section 10: Limitations, Sampling Heterogeneity, and Feasibility
     cells.append(nbf.v4.new_markdown_cell(
-r"""## 9. Limitations, Sampling Heterogeneity, and Feasibility
+r"""## 10. Limitations, Sampling Heterogeneity, and Feasibility
 
-1. **Substudy Cohort Size**: Mobile telemetry data in this release are available for a restricted pilot cohort ($N=32$). Findings cannot be generalized to the entire PPMI multicenter population without expansion.
+1. **Substudy Cohort Size**: Mobile telemetry data in this release are available for a restricted pilot cohort ($N=32$, comprising 19 PD, 12 Prodromal, and 1 Healthy Control). Findings represent feasibility and measurement properties rather than population prevalence.
 2. **Device & Sensor Heterogeneity**: Sampling frequency, accelerometer sensitivity, and operating system updates introduce platform-dependent noise into raw sensor signals.
-3. **Irregular Naturalistic Adherence**: Active testing requires active participant engagement; compliance varies between highly compliant participants (up to $6,500$ records) and lower-adherence participants ($<100$ records), introducing potential adherence-related selection bias."""
+3. **Naturalistic Adherence Heterogeneity**: Active testing requires sustained participant engagement; adherence spans from $<100$ records in less engaged individuals to $>6,500$ records in highly motivated participants."""
     ))
 
-    # Section 10: Conclusions Grounded in Displayed Results
+    # Section 11: Conclusions Grounded in Displayed Results
     cells.append(nbf.v4.new_markdown_cell(
-r"""## 10. Conclusions Grounded in Displayed Results
+r"""## 11. Conclusions Grounded in Displayed Results
 
-1. **Feasibility of High-Frequency Digital Monitoring**: The Roche mobile application successfully generates dense longitudinal telemetry in PD participants, with high repeat completion ($93.8\%$).
-2. **Granular Kinematic Phenotyping**: Hand turn speed, tremor power, and shape tracing yield continuous physical metrics that capture fine motor function beyond categorical clinical scores.
-3. **Analytical Readiness**: The digital sensor telemetry table is fully audited, structurally characterized, and ready for integration into the multimodal synthesis framework."""
+1. **Feasibility of High-Frequency Digital Monitoring**: The Roche mobile application demonstrates the operational feasibility of continuous home motor monitoring in a pilot cohort.
+2. **Kinematic Differentiation**: Active motor tests differentiate between measures with higher exploratory repeatability (Hand Turn speed) and episodic, fluctuating features (Postural Tremor power).
+3. **Paired Laterality Quantification**: Paired within-session comparisons capture quantifiable motor asymmetry between upper limbs."""
     ))
 
-    # Section 11: Reproducibility and Privacy Validation Summary
+    # Section 12: Reproducibility and Privacy Validation Summary
     cells.append(nbf.v4.new_markdown_cell(
-r"""## 11. Reproducibility and Privacy Validation Summary
+r"""## 12. Reproducibility and Privacy Validation Summary
 
 - **Participant Privacy**: Zero participant identifiers (`PATNO`), device IDs, or exact timestamps tied to individual records are displayed. All outputs represent aggregate cohort distributions.
 - **Reproducibility**: The code cell below programmatically certifies privacy compliance via `PrivacyGuard`."""
@@ -445,6 +762,9 @@ guard = PrivacyGuard()
 
 # Validate that telemetry adherence aggregate table contains zero participant records
 guard.assert_no_participant_records(adherence_data)
+guard.assert_no_participant_records(cadence_rows)
+guard.assert_no_participant_records(var_rows)
+guard.assert_no_participant_records(lat_rows)
 print("PrivacyGuard verification: PASSED (zero participant records or identifiers detected in aggregates).")
 print("All digital sensor outputs certified privacy-compliant. Execution complete.")"""
     ))

@@ -680,15 +680,15 @@ Descriptive shape classifications follow standard thresholds:
 """# Table: Distribution Shape and Skewness of Inventory Structural Metrics
 from ppmi_pipeline.reporting.notebook_support import numeric_skewness_summary
 
-tab_rows = df_manifest[df_manifest["Logical Rows"] > 0]["Logical Rows"]
-tab_cols = df_manifest[df_manifest["Columns"] > 0]["Columns"]
+tab_rows = df_tabular["Logical Rows"].replace(0, np.nan)
+tab_cols = df_tabular["Columns"].replace(0, np.nan)
 valid_missingness = pd.to_numeric(df_all_columns["Missingness (%)"], errors="coerce").dropna()
 
 skew_specs = [
-    {"domain": "Overview", "variable": "file_size_kb", "grain": "Discovered Physical Sources (KB, N=177)", "series": df_manifest["Size (KB)"]},
-    {"domain": "Overview", "variable": "tabular_row_count", "grain": "Audited Tabular Sources (Rows)", "series": tab_rows},
-    {"domain": "Overview", "variable": "column_count", "grain": "Audited Tabular Sources (Columns)", "series": tab_cols},
-    {"domain": "Overview", "variable": "column_missingness_pct", "grain": "Audited Catalog Columns (N=3,682)", "series": valid_missingness}
+    {"domain": "Overview", "variable": "file_size_kb", "grain": f"Discovered Physical Sources (KB, N={len(df_manifest)})", "series": df_manifest["Size (KB)"], "total_n": len(df_manifest)},
+    {"domain": "Overview", "variable": "tabular_row_count", "grain": f"Audited Tabular Sources (Rows, N={len(df_tabular)})", "series": tab_rows, "total_n": len(df_tabular)},
+    {"domain": "Overview", "variable": "column_count", "grain": f"Audited Tabular Sources (Columns, N={len(df_tabular)})", "series": tab_cols, "total_n": len(df_tabular)},
+    {"domain": "Overview", "variable": "column_missingness_pct", "grain": f"Audited Catalog Columns (N={len(df_all_columns):,})", "series": df_all_columns["Missingness (%)"], "total_n": len(df_all_columns)}
 ]
 
 skewness_df = numeric_skewness_summary(skew_specs)
