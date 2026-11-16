@@ -1060,7 +1060,7 @@ def main():
     if str(src_path) not in sys.path:
         sys.path.insert(0, str(src_path))
 
-    notebook_path = repo_root / "00_dataset_overview.ipynb"
+    notebook_path = (repo_root / "notebooks" / "00_dataset_overview.ipynb") if (repo_root / "notebooks").exists() else (repo_root / "00_dataset_overview.ipynb")
     print(f"Generating notebook structure at {notebook_path}...")
     nb = create_overview_notebook()
 

@@ -36,6 +36,14 @@ from ppmi_pipeline.reporting.privacy import PrivacyGuard
 
 
 REPO_ROOT = resolve_repo_root()
+NOTEBOOKS_DIR = REPO_ROOT / "notebooks" if (REPO_ROOT / "notebooks").exists() else REPO_ROOT
+
+
+def get_notebook_path(nb_name: str, base_root: Path = REPO_ROOT) -> Path:
+    nb_dir = base_root / "notebooks"
+    if (nb_dir / nb_name).exists():
+        return nb_dir / nb_name
+    return base_root / nb_name
 
 ALL_SEVEN_NOTEBOOKS = [
     "00_dataset_overview.ipynb",
@@ -138,7 +146,7 @@ def test_safe_merge_cardinality_enforcement():
 def test_notebooks_exist_and_are_valid_json():
     """Verify that all seven notebooks exist on disk and parse as valid Jupyter notebooks."""
     for nb_name in ALL_SEVEN_NOTEBOOKS:
-        nb_path = REPO_ROOT / nb_name
+        nb_path = get_notebook_path(nb_name)
         assert nb_path.exists(), f"Notebook {nb_name} does not exist at {nb_path}"
         with open(nb_path, "r", encoding="utf-8") as f:
             nb = nbformat.read(f, as_version=4)
@@ -148,7 +156,7 @@ def test_notebooks_exist_and_are_valid_json():
 def test_notebooks_contain_all_eleven_mandatory_sections():
     """Verify that all six new notebooks contain all 11 mandatory sections."""
     for nb_name in NEW_SIX_NOTEBOOKS:
-        nb_path = REPO_ROOT / nb_name
+        nb_path = get_notebook_path(nb_name)
         if not nb_path.exists():
             pytest.skip(f"Notebook {nb_name} not yet built")
             
@@ -166,7 +174,7 @@ def test_notebooks_pass_privacy_guard_cleanly():
     """Verify that PrivacyGuard certifies zero participant identifiers or PHI across all notebooks."""
     guard = PrivacyGuard()
     for nb_name in ALL_SEVEN_NOTEBOOKS:
-        nb_path = REPO_ROOT / nb_name
+        nb_path = get_notebook_path(nb_name)
         if not nb_path.exists():
             continue
         with open(nb_path, "r", encoding="utf-8") as f:
@@ -238,7 +246,7 @@ def test_all_134_approved_units_have_non_empty_dictionaries():
 def test_all_seven_notebooks_have_valid_execution_counts_and_zero_errors():
     """Verify that all seven saved notebooks executed cleanly with monotonic counts and no errors (NB-08)."""
     for nb_name in ALL_SEVEN_NOTEBOOKS:
-        nb_path = REPO_ROOT / nb_name
+        nb_path = get_notebook_path(nb_name)
         assert nb_path.exists(), f"Notebook {nb_name} missing at {nb_path}"
         with open(nb_path, "r", encoding="utf-8") as f:
             nb = nbformat.read(f, as_version=4)
@@ -434,7 +442,7 @@ def test_all_notebooks_contain_executed_skewness_table():
     import re
 
     for nb_name, exp_vars in EXPECTED_SKEWNESS_VARIABLES.items():
-        nb_path = REPO_ROOT / nb_name
+        nb_path = get_notebook_path(nb_name)
         assert nb_path.exists(), f"Notebook {nb_name} missing"
         with open(nb_path, "r", encoding="utf-8") as f:
             nb = json.load(f)
@@ -462,7 +470,7 @@ def test_all_notebooks_contain_executed_skewness_table():
 def test_skewness_contract_negative_mutation_fails():
     """Verify that the contract test strictly fails if an expected variable is missing or mutated."""
     import pytest
-    nb_path = REPO_ROOT / "eda_genetics.ipynb"
+    nb_path = get_notebook_path("eda_genetics.ipynb")
     assert nb_path.exists()
     with open(nb_path, "r", encoding="utf-8") as f:
         nb = json.load(f)
@@ -481,7 +489,7 @@ def test_skewness_contract_negative_mutation_fails():
 
 def test_sensor_skewness_contract_negative_mutation_fails():
     """Negative fixture: verify that dropping any of the 9 required sensor skewness variables fails the contract test."""
-    nb_path = REPO_ROOT / "eda_digital_sensors.ipynb"
+    nb_path = get_notebook_path("eda_digital_sensors.ipynb")
     assert nb_path.exists()
     with open(nb_path, "r", encoding="utf-8") as f:
         nb = json.load(f)
@@ -540,7 +548,7 @@ def test_deep_csv_inventory_physical_parity_and_coverage():
     whose dimensions match physical shapes, whose grain keys are valid, and whose
     documentation sources are verified or explicitly marked as not verified locally."""
     for nb_name in NEW_SIX_NOTEBOOKS:
-        nb_path = REPO_ROOT / nb_name
+        nb_path = get_notebook_path(nb_name)
         assert nb_path.exists(), f"Notebook {nb_name} missing"
         with open(nb_path, "r", encoding="utf-8") as f:
             nb = json.load(f)
@@ -771,7 +779,7 @@ def test_deep_csv_join_audits_enforced():
     """Verify that all six modality/synthesis notebooks contain executed join audits with valid cardinalities,
     and verify fail-closed rejection of many-to-many joins."""
     for nb_name in NEW_SIX_NOTEBOOKS:
-        nb_path = REPO_ROOT / nb_name
+        nb_path = get_notebook_path(nb_name)
         assert nb_path.exists()
         with open(nb_path, "r", encoding="utf-8") as f:
             nb = json.load(f)
@@ -803,7 +811,7 @@ def test_deep_csv_narrative_no_hardcoded_claims():
         "non-redundant biological information"
     ]
     for nb_name in NEW_SIX_NOTEBOOKS:
-        nb_path = REPO_ROOT / nb_name
+        nb_path = get_notebook_path(nb_name)
         with open(nb_path, "r", encoding="utf-8") as f:
             nb = json.load(f)
 
@@ -820,7 +828,7 @@ def test_deep_csv_narrative_no_hardcoded_claims():
 def test_genetics_small_cell_non_reconstructible():
     """Verify that Table 8.3 in eda_genetics.ipynb enforces non-reconstructible small-cell suppression:
     no cell < 5 is exposed, and complementary cells prevent solving for small groups."""
-    nb_path = REPO_ROOT / "eda_genetics.ipynb"
+    nb_path = get_notebook_path("eda_genetics.ipynb")
     assert nb_path.exists()
     with open(nb_path, "r", encoding="utf-8") as f:
         nb = json.load(f)
@@ -864,7 +872,7 @@ def test_genetics_small_cell_non_reconstructible():
 def test_mri_acquisition_population_reconciliation():
     """Verify that Table 8.4B in eda_neuroimaging.ipynb explicitly breaks down both All Records (N=8,779)
     and Baseline Sessions (N=3,351) with Total, Valid, Missing, Yes, and No counts."""
-    nb_path = REPO_ROOT / "eda_neuroimaging.ipynb"
+    nb_path = get_notebook_path("eda_neuroimaging.ipynb")
     assert nb_path.exists()
     with open(nb_path, "r", encoding="utf-8") as f:
         nb = json.load(f)
@@ -1004,7 +1012,7 @@ def validate_report_against_notebook_artifacts(content: str, repo_root: Path):
     total_code_cells = 0
     total_outputs = 0
     for nb_name, (exp_cells, exp_outs) in expected_nb_counts.items():
-        nb_p = repo_root / nb_name
+        nb_p = get_notebook_path(nb_name, repo_root)
         assert nb_p.exists(), f"Notebook {nb_name} missing"
         with open(nb_p, "r", encoding="utf-8") as f:
             nb_json = json.load(f)
@@ -1027,7 +1035,7 @@ def validate_report_against_notebook_artifacts(content: str, repo_root: Path):
     assert "286 executed outputs" in content or "286 outputs" in content
 
     # 2. Extract executed Table 8.4B and verify MRI counts
-    nb_img = json.load(open(repo_root / "eda_neuroimaging.ipynb", encoding="utf-8"))
+    nb_img = json.load(open(get_notebook_path("eda_neuroimaging.ipynb", repo_root), encoding="utf-8"))
     tbl_84b = None
     for c in nb_img["cells"]:
         for out in c.get("outputs", []):
@@ -1045,7 +1053,7 @@ def validate_report_against_notebook_artifacts(content: str, repo_root: Path):
     assert "1,173 baseline MRI" not in content
 
     # 3. Extract Table 8.3 and verify genetics carrier counts
-    nb_gen = json.load(open(repo_root / "eda_genetics.ipynb", encoding="utf-8"))
+    nb_gen = json.load(open(get_notebook_path("eda_genetics.ipynb", repo_root), encoding="utf-8"))
     tbl_83 = None
     for c in nb_gen["cells"]:
         for out in c.get("outputs", []):

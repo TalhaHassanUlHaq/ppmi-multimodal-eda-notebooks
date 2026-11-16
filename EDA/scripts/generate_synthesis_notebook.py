@@ -686,7 +686,7 @@ print("All multimodal synthesis outputs certified privacy-compliant. Execution c
 def generate_and_execute_synthesis_notebook():
     root = resolve_repo_root()
     nb = build_synthesis_notebook()
-    nb_path = root / "eda_multimodal_synthesis.ipynb"
+    nb_path = (root / "notebooks" / "eda_multimodal_synthesis.ipynb") if (root / "notebooks").exists() else (root / "eda_multimodal_synthesis.ipynb")
     
     print(f"Writing notebook skeleton to {nb_path}...")
     with open(nb_path, "w", encoding="utf-8") as f:

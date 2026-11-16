@@ -1167,7 +1167,7 @@ def test_cross_artifact_counts_reconcile_globally(repo_root, selection_data):
 
 def test_notebook_selection_evidence_completeness(repo_root):
     """Notebook Table 12.5 must contain EXACTLY 183 data rows and ALL 57 required column headers (SG-05, SG-11)."""
-    nb_path = repo_root / "00_dataset_overview.ipynb"
+    nb_path = (repo_root / "notebooks" / "00_dataset_overview.ipynb") if (repo_root / "notebooks" / "00_dataset_overview.ipynb").exists() else (repo_root / "00_dataset_overview.ipynb")
     assert nb_path.exists()
 
     with open(nb_path, "r", encoding="utf-8") as f:
@@ -1256,7 +1256,7 @@ def test_privacy_guard_validates_selection_artifacts_and_notebook(repo_root):
     pg.assert_no_participant_records(decisions_text, context="dataset_selection_decisions.md")
 
     # 5. Executed notebook
-    nb_path = repo_root / "00_dataset_overview.ipynb"
+    nb_path = (repo_root / "notebooks" / "00_dataset_overview.ipynb") if (repo_root / "notebooks" / "00_dataset_overview.ipynb").exists() else (repo_root / "00_dataset_overview.ipynb")
     with open(nb_path, "r", encoding="utf-8") as f:
         nb_data = json.load(f)
     pg.validate_notebook_outputs(nb_data)

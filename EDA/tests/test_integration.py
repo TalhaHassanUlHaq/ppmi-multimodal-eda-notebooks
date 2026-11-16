@@ -105,7 +105,7 @@ def test_inventory_cross_deliverable_consistency(repo_root: Path):
     schema_file = reports_dir / "phase1_schema_catalog.json"
     grain_file = reports_dir / "phase1_grain_catalog.json"
     report_file = reports_dir / "phase1_inventory_report.md"
-    notebook_file = repo_root / "00_dataset_overview.ipynb"
+    notebook_file = (repo_root / "notebooks" / "00_dataset_overview.ipynb") if (repo_root / "notebooks" / "00_dataset_overview.ipynb").exists() else (repo_root / "00_dataset_overview.ipynb")
 
     assert inv_file.exists(), "Inventory JSON missing!"
     assert schema_file.exists(), "Schema catalog JSON missing!"
@@ -220,7 +220,7 @@ def test_notebook_markdown_conclusions_and_saved_outputs(repo_root: Path):
     import json
     from ppmi_pipeline.reporting.privacy import PrivacyGuard
 
-    notebook_file = repo_root / "00_dataset_overview.ipynb"
+    notebook_file = (repo_root / "notebooks" / "00_dataset_overview.ipynb") if (repo_root / "notebooks" / "00_dataset_overview.ipynb").exists() else (repo_root / "00_dataset_overview.ipynb")
     schema_file = repo_root / "EDA" / "outputs" / "reports" / "phase1_schema_catalog.json"
     assert notebook_file.exists()
     assert schema_file.exists()

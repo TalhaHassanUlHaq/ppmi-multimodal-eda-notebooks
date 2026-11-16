@@ -776,7 +776,7 @@ print("All digital sensor outputs certified privacy-compliant. Execution complet
 def generate_and_execute_sensors_notebook():
     root = resolve_repo_root()
     nb = build_sensors_notebook()
-    nb_path = root / "eda_digital_sensors.ipynb"
+    nb_path = (root / "notebooks" / "eda_digital_sensors.ipynb") if (root / "notebooks").exists() else (root / "eda_digital_sensors.ipynb")
     
     print(f"Writing notebook skeleton to {nb_path}...")
     with open(nb_path, "w", encoding="utf-8") as f:

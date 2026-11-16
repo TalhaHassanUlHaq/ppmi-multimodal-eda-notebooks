@@ -722,7 +722,7 @@ print("All genetics outputs certified privacy-compliant. Execution complete.")""
 def generate_and_execute_genetics_notebook():
     root = resolve_repo_root()
     nb = build_genetics_notebook()
-    nb_path = root / "eda_genetics.ipynb"
+    nb_path = (root / "notebooks" / "eda_genetics.ipynb") if (root / "notebooks").exists() else (root / "eda_genetics.ipynb")
     
     print(f"Writing notebook skeleton to {nb_path}...")
     with open(nb_path, "w", encoding="utf-8") as f:

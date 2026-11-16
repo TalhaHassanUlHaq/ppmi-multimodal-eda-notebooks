@@ -47,7 +47,7 @@ def resolve_repo_root(repo_root: Optional[Path] = None) -> Path:
     curr = Path.cwd().resolve()
     if (curr / "EDA" / "outputs" / "reports").exists():
         return curr
-    if curr.name == "EDA" and (curr.parent / "EDA" / "outputs" / "reports").exists():
+    if (curr.parent / "EDA" / "outputs" / "reports").exists():
         return curr.parent
     
     # Fallback to module hierarchy

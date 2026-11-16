@@ -914,7 +914,7 @@ print("All neuroimaging outputs certified privacy-compliant. Execution complete.
 def generate_and_execute_neuroimaging_notebook():
     root = resolve_repo_root()
     nb = build_neuroimaging_notebook()
-    nb_path = root / "eda_neuroimaging.ipynb"
+    nb_path = (root / "notebooks" / "eda_neuroimaging.ipynb") if (root / "notebooks").exists() else (root / "eda_neuroimaging.ipynb")
     
     print(f"Writing notebook skeleton to {nb_path}...")
     with open(nb_path, "w", encoding="utf-8") as f:

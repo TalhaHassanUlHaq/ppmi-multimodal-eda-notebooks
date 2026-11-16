@@ -687,7 +687,7 @@ print("All biospecimen outputs certified privacy-compliant. Execution complete."
 def generate_and_execute_biospecimen_notebook():
     root = resolve_repo_root()
     nb = build_biospecimen_notebook()
-    nb_path = root / "eda_biospecimen.ipynb"
+    nb_path = (root / "notebooks" / "eda_biospecimen.ipynb") if (root / "notebooks").exists() else (root / "eda_biospecimen.ipynb")
     
     print(f"Writing notebook skeleton to {nb_path}...")
     with open(nb_path, "w", encoding="utf-8") as f:

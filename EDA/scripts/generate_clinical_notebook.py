@@ -1022,7 +1022,7 @@ print("All clinical outputs certified privacy-compliant. Execution complete.")""
 def generate_and_execute_clinical_notebook():
     root = resolve_repo_root()
     nb = build_clinical_notebook()
-    nb_path = root / "eda_clinical.ipynb"
+    nb_path = (root / "notebooks" / "eda_clinical.ipynb") if (root / "notebooks").exists() else (root / "eda_clinical.ipynb")
     
     print(f"Writing notebook skeleton to {nb_path}...")
     with open(nb_path, "w", encoding="utf-8") as f:
